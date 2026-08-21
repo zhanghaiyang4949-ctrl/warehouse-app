@@ -1308,6 +1308,42 @@ th{background:#f7f8fa}
   }
 }
 </style>
+
+<style id="findFilterStyleV49">
+.findResultFiltersV49{
+  margin-bottom:8px;
+}
+.findFilterGridV49{
+  display:grid;
+  grid-template-columns:1fr 1fr 1fr auto;
+  gap:6px;
+  align-items:center;
+}
+.findFilterGridV49 select,
+.findFilterGridV49 button{
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+}
+.findFilterGridV49 select{
+  border:1px solid #cfd5dc;
+  border-radius:7px;
+  background:#fff;
+  padding:8px 5px;
+  font-size:11px;
+}
+@media(max-width:600px){
+  .findFilterGridV49{
+    grid-template-columns:1fr 1fr;
+    gap:4px;
+  }
+  .findFilterGridV49 select,
+  .findFilterGridV49 button{
+    font-size:10px!important;
+    padding:8px 4px!important;
+  }
+}
+</style>
 </head>
 <body>
 <div class="header">📦 快递托盘定位系统 V1</div>
@@ -1415,6 +1451,22 @@ th{background:#f7f8fa}
 
 </div>
 </details>
+
+<div id="findResultFiltersV49" class="card findResultFiltersV49" style="display:none">
+  <div class="findFilterGridV49">
+    <select id="findFilterCustomerV49" onchange="applyFindResultFiltersV49()">
+      <option value="">全部客户</option>
+    </select>
+    <select id="findFilterDateV49" onchange="applyFindResultFiltersV49()">
+      <option value="">全部日期</option>
+    </select>
+    <select id="findFilterPalletV49" onchange="applyFindResultFiltersV49()">
+      <option value="">全部托盘</option>
+    </select>
+    <button class="gray" type="button" onclick="clearFindResultFiltersV49()">清除筛选</button>
+  </div>
+  <div id="findFilterSummaryV49" class="muted" style="margin-top:6px"></div>
+</div>
 <div class="card" id="findResult"><div class="empty">扫描或输入信息后搜索</div></div>
 </section>
 <section class="page" id="pallet">
@@ -2260,17 +2312,17 @@ function undoRecentInbound(id){
 function markItemTaken(id){
  const x=db.items.find(v=>Number(v.id)===Number(id));
  if(!x||x.deleted){toast("记录不存在或已处理");return;}
+
  x.deleted=true;
  x.deletedAt=new Date().toLocaleString();
  x.deleteReason="找货后已取走";
+
  save();
  refresh();
  toast("已标记为已取走");
 
- const batchText=(document.getElementById("batchFindInput")?.value||"").trim();
- const normalText=(document.getElementById("findInput")?.value||"").trim();
- if(batchText)batchFindExpress();
- else if(normalText)findExpress();
+ buildFindResultFiltersV49(false);
+ renderStoredFindResultsV49();
 }
 function batchFindExpress(){
   var input=document.getElementById("batchFindInput");
@@ -2279,8 +2331,8 @@ function batchFindExpress(){
 
   var text=input ? String(input.value||"").trim() : "";
   if(!text){
-    if(summary) summary.textContent="请先粘贴或输入多行单号";
-    if(result) result.innerHTML='<div class="empty">请先粘贴或输入多行单号</div>';
+    if(summary)summary.textContent="请先粘贴或输入多行单号";
+    if(result)result.innerHTML='<div class="empty">请先粘贴或输入多行单号</div>';
     return;
   }
 
@@ -2290,7 +2342,7 @@ function batchFindExpress(){
 
   for(var i=0;i<lines.length;i++){
     var line=String(lines[i]||"").trim();
-    if(!line) continue;
+    if(!line)continue;
 
     var digits=line.replace(/\D/g,"");
     var key=digits.length>=4 ? digits.slice(-4) : line.slice(-4);
@@ -2302,12 +2354,12 @@ function batchFindExpress(){
   }
 
   if(!keys.length){
-    if(summary) summary.textContent="没有提取到可查询的单号";
-    if(result) result.innerHTML='<div class="empty">没有提取到可查询的单号</div>';
+    if(summary)summary.textContent="没有提取到可查询的单号";
+    if(result)result.innerHTML='<div class="empty">没有提取到可查询的单号</div>';
     return;
   }
 
-  var blocks=[];
+  var groups=[];
   var foundKeys=0;
   var notFoundKeys=0;
   var totalMatches=0;
@@ -2318,8 +2370,8 @@ function batchFindExpress(){
 
     for(var j=0;j<db.items.length;j++){
       var x=db.items[j];
-      if(!x || x.deleted) continue;
-      if(!(x.status==="在库" || !x.status)) continue;
+      if(!x || x.deleted)continue;
+      if(!(x.status==="在库" || !x.status))continue;
 
       var express=String(x.express||"").trim();
       var last4=String(x.last4 || express.slice(-4)).trim();
@@ -2336,42 +2388,18 @@ function batchFindExpress(){
     if(matches.length){
       foundKeys++;
       totalMatches+=matches.length;
-
-      var cards="";
-      for(var z=0;z<matches.length;z++){
-        var item=matches[z];
-        cards +=
-          '<div class="findResultCard">'+
-            '<div class="findResultLeft">'+
-              '<div class="findResultLine"><span class="label">快递</span><b>'+esc(item.express||"-")+'</b></div>'+
-              '<div class="findResultLine"><span class="label">客户</span><b>'+esc(item.customer||"-")+'</b></div>'+
-              '<div class="findResultLine"><span class="label">日期</span><b>'+esc(item.date||"-")+'</b></div>'+
-              '<button class="success findTakenBtn" type="button" onclick="markItemTaken('+Number(item.id)+')">✓ 已取走</button>'+
-            '</div>'+
-            '<div class="findResultPallet">'+
-              '<div class="label">托盘</div>'+
-              '<div class="value">'+esc(item.pallet||"-")+'</div>'+
-            '</div>'+
-          '</div>';
-      }
-
-      blocks.push(
-        '<div class="batchFindGroup">'+
-          '<div class="batchFindGroupHeader"><span>后4位：'+esc(key)+'</span><span>'+matches.length+' 条</span></div>'+
-          '<div class="findResultList">'+cards+'</div>'+
-        '</div>'
-      );
+      groups.push({key:key,matches:matches});
     }else{
       notFoundKeys++;
-      blocks.push(
-        '<div class="batchFindGroup notFound">'+
-          '<div class="batchFindGroupHeader"><span>后4位：'+esc(key)+'</span><span>未找到</span></div>'+
-        '</div>'
-      );
     }
   }
 
-  if(result) result.innerHTML=blocks.join("");
+  findResultStateV49={
+    type:"batch",
+    singleItems:[],
+    batchGroups:groups
+  };
+
   if(summary){
     summary.textContent=
       "输入 "+lines.filter(function(v){return String(v||"").trim();}).length+
@@ -2380,22 +2408,16 @@ function batchFindExpress(){
       " 个，未找到 "+notFoundKeys+
       " 个，共匹配 "+totalMatches+" 条。";
   }
-}
-function insertBatchFindNewlineV47(){
- const el=document.getElementById("batchFindInput");
- if(!el)return;
- try{
-   const start=typeof el.selectionStart==="number"?el.selectionStart:el.value.length;
-   const end=typeof el.selectionEnd==="number"?el.selectionEnd:start;
-   el.value=el.value.slice(0,start)+"\n"+el.value.slice(end);
-   const pos=start+1;
-   el.setSelectionRange(pos,pos);
- }catch(e){
-   el.value=(el.value||"")+"\n";
- }
- try{el.focus({preventScroll:true});}catch(e){el.focus();}
-}
 
+  if(!totalMatches){
+    var filterBox=document.getElementById("findResultFiltersV49");
+    if(filterBox)filterBox.style.display="none";
+    if(result)result.innerHTML='<div class="empty">没有找到符合条件的在库货物</div>';
+    return;
+  }
+
+  resetFindResultFiltersV49();
+}
 function clearBatchFind(){
  const t=document.getElementById("batchFindInput");if(t)t.value="";
  const s=document.getElementById("batchFindSummary");if(s)s.textContent="";
@@ -2793,9 +2815,207 @@ function clearQuickFindV48(){
  });
 }
 
+
+let findResultStateV49={
+ type:"",
+ singleItems:[],
+ batchGroups:[]
+};
+
+function getActiveFindItemsV49(){
+ if(findResultStateV49.type==="single"){
+   return (findResultStateV49.singleItems||[]).filter(function(x){
+     return x && !x.deleted && (x.status==="在库" || !x.status);
+   });
+ }
+
+ if(findResultStateV49.type==="batch"){
+   var arr=[];
+   (findResultStateV49.batchGroups||[]).forEach(function(g){
+     (g.matches||[]).forEach(function(x){
+       if(x && !x.deleted && (x.status==="在库" || !x.status))arr.push(x);
+     });
+   });
+   return arr;
+ }
+
+ return [];
+}
+
+function uniqueSortedFindValuesV49(items,field){
+ var seen={};
+ var arr=[];
+ items.forEach(function(x){
+   var v=String(x && x[field]!==undefined ? x[field] : "").trim();
+   if(!v)v="-";
+   if(!seen[v]){
+     seen[v]=true;
+     arr.push(v);
+   }
+ });
+ return arr.sort(function(a,b){return a.localeCompare(b,"zh-CN",{numeric:true});});
+}
+
+function setSelectOptionsV49(id,label,values,current){
+ var el=document.getElementById(id);
+ if(!el)return;
+ var html='<option value="">'+label+'</option>';
+ values.forEach(function(v){
+   html+='<option value="'+esc(v)+'">'+esc(v)+'</option>';
+ });
+ el.innerHTML=html;
+ if(current && values.indexOf(current)>=0)el.value=current;
+}
+
+function buildFindResultFiltersV49(reset){
+ var box=document.getElementById("findResultFiltersV49");
+ var items=getActiveFindItemsV49();
+
+ if(!box)return;
+ if(!items.length){
+   box.style.display="none";
+   return;
+ }
+
+ var c=document.getElementById("findFilterCustomerV49");
+ var d=document.getElementById("findFilterDateV49");
+ var p=document.getElementById("findFilterPalletV49");
+
+ var oldC=reset?"":(c?c.value:"");
+ var oldD=reset?"":(d?d.value:"");
+ var oldP=reset?"":(p?p.value:"");
+
+ setSelectOptionsV49(
+   "findFilterCustomerV49",
+   "全部客户",
+   uniqueSortedFindValuesV49(items,"customer"),
+   oldC
+ );
+ setSelectOptionsV49(
+   "findFilterDateV49",
+   "全部日期",
+   uniqueSortedFindValuesV49(items,"date"),
+   oldD
+ );
+ setSelectOptionsV49(
+   "findFilterPalletV49",
+   "全部托盘",
+   uniqueSortedFindValuesV49(items,"pallet"),
+   oldP
+ );
+
+ box.style.display="block";
+}
+
+function itemPassesFindFiltersV49(x){
+ var customer=document.getElementById("findFilterCustomerV49")?.value||"";
+ var date=document.getElementById("findFilterDateV49")?.value||"";
+ var pallet=document.getElementById("findFilterPalletV49")?.value||"";
+
+ var xvCustomer=String(x.customer||"").trim()||"-";
+ var xvDate=String(x.date||"").trim()||"-";
+ var xvPallet=String(x.pallet||"").trim()||"-";
+
+ if(customer && xvCustomer!==customer)return false;
+ if(date && xvDate!==date)return false;
+ if(pallet && xvPallet!==pallet)return false;
+ return true;
+}
+
+function renderFindCardV49(x){
+ return `
+   <div class="findResultCard">
+     <div class="findResultLeft">
+       <div class="findResultLine"><span class="label">快递</span><b>${esc(x.express||"-")}</b></div>
+       <div class="findResultLine"><span class="label">客户</span><b>${esc(x.customer||"-")}</b></div>
+       <div class="findResultLine"><span class="label">日期</span><b>${esc(x.date||"-")}</b></div>
+       <button class="success findTakenBtn" type="button" onclick="markItemTaken(${Number(x.id)})">✓ 已取走</button>
+     </div>
+     <div class="findResultPallet">
+       <div class="label">托盘</div>
+       <div class="value">${esc(x.pallet||"-")}</div>
+     </div>
+   </div>`;
+}
+
+function renderStoredFindResultsV49(){
+ var result=document.getElementById("findResult");
+ var summary=document.getElementById("findFilterSummaryV49");
+ if(!result)return;
+
+ var allItems=getActiveFindItemsV49();
+ var visibleCount=0;
+
+ if(findResultStateV49.type==="single"){
+   var visible=allItems.filter(itemPassesFindFiltersV49);
+   visibleCount=visible.length;
+
+   if(!visible.length){
+     result.innerHTML='<div class="empty">当前筛选条件下没有结果</div>';
+   }else{
+     result.innerHTML=
+       '<div class="muted" style="margin-bottom:8px">当前显示 '+visible.length+' / '+allItems.length+' 条在库记录</div>'+
+       '<div class="findResultList">'+visible.map(renderFindCardV49).join("")+'</div>';
+   }
+ }
+
+ else if(findResultStateV49.type==="batch"){
+   var blocks=[];
+   var totalAll=0;
+
+   (findResultStateV49.batchGroups||[]).forEach(function(g){
+     var active=(g.matches||[]).filter(function(x){
+       return x && !x.deleted && (x.status==="在库" || !x.status);
+     });
+
+     totalAll+=active.length;
+     var visible=active.filter(itemPassesFindFiltersV49);
+     visibleCount+=visible.length;
+
+     if(visible.length){
+       blocks.push(
+         '<div class="batchFindGroup">'+
+           '<div class="batchFindGroupHeader"><span>后4位：'+esc(g.key)+'</span><span>'+visible.length+' 条</span></div>'+
+           '<div class="findResultList">'+visible.map(renderFindCardV49).join("")+'</div>'+
+         '</div>'
+       );
+     }
+   });
+
+   if(!blocks.length){
+     result.innerHTML='<div class="empty">当前筛选条件下没有结果</div>';
+   }else{
+     result.innerHTML=blocks.join("");
+   }
+ }
+
+ if(summary){
+   summary.textContent="当前筛选显示 "+visibleCount+" / "+allItems.length+" 条";
+ }
+}
+
+function applyFindResultFiltersV49(){
+ renderStoredFindResultsV49();
+}
+
+function clearFindResultFiltersV49(){
+ var ids=["findFilterCustomerV49","findFilterDateV49","findFilterPalletV49"];
+ ids.forEach(function(id){
+   var el=document.getElementById(id);
+   if(el)el.value="";
+ });
+ renderStoredFindResultsV49();
+}
+
+function resetFindResultFiltersV49(){
+ buildFindResultFiltersV49(true);
+ renderStoredFindResultsV49();
+}
+
 function findExpress(){
  const raw=(document.getElementById("findInput")?.value||"").trim();
  const result=document.getElementById("findResult");
+
  if(!raw){
    if(result)result.innerHTML='<div class="empty">请输入搜索内容</div>';
    return;
@@ -2821,30 +3041,20 @@ function findExpress(){
    })
    .sort((a,b)=>Number(b.id||0)-Number(a.id||0));
 
- if(!result)return;
+ findResultStateV49={
+   type:"single",
+   singleItems:matches,
+   batchGroups:[]
+ };
 
  if(!matches.length){
-   result.innerHTML='<div class="empty">没有找到符合条件的在库货物</div>';
+   const filterBox=document.getElementById("findResultFiltersV49");
+   if(filterBox)filterBox.style.display="none";
+   if(result)result.innerHTML='<div class="empty">没有找到符合条件的在库货物</div>';
    return;
  }
 
- result.innerHTML=
-   '<div class="muted" style="margin-bottom:8px">找到 '+matches.length+' 条在库记录</div>'+
-   '<div class="findResultList">'+
-   matches.map(x=>`
-     <div class="findResultCard">
-       <div class="findResultLeft">
-         <div class="findResultLine"><span class="label">快递</span><b>${esc(x.express||"-")}</b></div>
-         <div class="findResultLine"><span class="label">客户</span><b>${esc(x.customer||"-")}</b></div>
-         <div class="findResultLine"><span class="label">日期</span><b>${esc(x.date||"-")}</b></div><button class="success findTakenBtn" type="button" onclick="markItemTaken(${Number(x.id)})">✓ 已取走</button>
-       </div>
-       <div class="findResultPallet">
-         <div class="label">托盘</div>
-         <div class="value">${esc(x.pallet||"-")}</div>
-       </div>
-     </div>
-   `).join("")+
-   '</div>';
+ resetFindResultFiltersV49();
 }
 function showFind(x){
  document.getElementById("findResult").innerHTML=`

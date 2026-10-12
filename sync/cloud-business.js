@@ -4,10 +4,11 @@ function cloudItemTime(item){return Date.parse(item.inTimeIso||item.inTime||item
 (function(){
  const el=id=>document.getElementById(id),sessionKey='warehouseWebSessionV1',pendingKey='warehouseWebPendingV1',cacheKey='warehouseWebReadCacheV1';
  let session=null,online=false,busy=false,timer=null,delay=5000,editingVersion=null,selectedVersions=new Map(),taskDirty=false,authoritative='',backgroundPaint=false,taskItemVersions={};
- const bar=document.createElement('section');bar.className='cloudBar';bar.innerHTML='<div><b id="cloudAccount">云端仓库 · 同步开发版</b><span id="cloudStatus" role="status">正在核对账号与库存…</span></div><div class="cloudActions"><button id="cloudRefresh" class="gray">刷新</button><button id="cloudRetry" class="primary" hidden>确认上次操作</button><a href="/">连接与退出登录</a></div>';
+ const bar=document.createElement('section');bar.className='cloudBar';bar.innerHTML='<div><b id="cloudAccount">云端仓库 · 同步开发版</b><span id="cloudStatus" role="status">正在核对账号与库存…</span></div><div class="cloudActions"><button id="cloudRefresh" class="gray">刷新</button><button id="cloudRetry" class="primary" hidden>确认上次操作</button><a href="连接测试.html">连接与退出登录</a></div>';
  document.body.prepend(bar);
  const setStatus=(s,error=false)=>{el('cloudStatus').textContent=s;bar.dataset.error=String(error);el('cloudRetry').hidden=!client.pending};
  const client=new CloudWarehouse({request:request,publish:publish});
+ let migrationControl=null;
  window.warehouseCloud=client;
  try{session=JSON.parse(sessionStorage.getItem(sessionKey)||'null');const saved=JSON.parse(sessionStorage.getItem(pendingKey)||'null');if(saved&&saved.sessionId===session?.sessionId)client.pending=saved.request}catch{}
  async function request(action,args={}){
@@ -29,18 +30,19 @@ function cloudItemTime(item){return Date.parse(item.inTimeIso||item.inTime||item
   if(el('viewPallet').value)viewPallet();
   setStatus('已同步 '+new Date(snapshot.readAt).toLocaleTimeString()+' · '+db.items.length+' 条记录'+(taskDirty?' · 配单有未保存内容':''));
   savePending();
+  if(migrationControl)void migrationControl.update(snapshot.user);
  }
  function toWebTask(task){return {...task,lineStates:structuredClone(task.lines||[])} }
- function failure(e){online=false;setStatus(e.message+'；当前显示上次读取的数据，暂停提交',true);toast(e.message)}
+ function failure(e){online=false;setStatus(e.message+'；当前显示上次读取的数据，暂停提交',true);toast(e.message);if(client.maintenance&&migrationControl)void request('me').then(r=>migrationControl.update(r.user)).catch(()=>{})}
  function savePending(){try{if(client.pending)sessionStorage.setItem(pendingKey,JSON.stringify({sessionId:session?.sessionId,request:client.pending}));else sessionStorage.removeItem(pendingKey)}catch{toast('浏览器无法保存重试凭据，请保持当前页面打开')}el('cloudRetry').hidden=!client.pending;for(const field of document.querySelectorAll('#packCurrentCardV83 input,#packCurrentCardV83 select,#packWeightRowsV83 input,#packNoteV83'))field.disabled=!!client.pending}
  async function mutate(action,args,onSuccess=()=>{}){
   if(busy){toast('正在处理，请稍候');return false}
   if(!online||!client.snapshot){toast('请先刷新并确认云端连接');return false}
-  busy=true;try{
+  busy=true;setStatus('正在提交…');bar.dataset.busy='true';try{
    const response=client.write(action,args);savePending();const result=await response;savePending();onSuccess(result);
-   try{if(client.loading)await client.loading;await client.refresh()}catch(e){failure(e);setStatus('操作已成功提交；刷新失败，请恢复连接后刷新核对',true)}
+   if(!result.changes){try{await client.refresh()}catch(e){failure(e);setStatus('操作已成功提交；刷新失败，请恢复连接后刷新核对',true)}}else void client.check().catch(failure);
    toast('云端已确认');return true;
-  }catch(e){savePending();setStatus(e.message,true);toast(e.message);if(e.uncertain)online=false;return false}finally{busy=false}
+  }catch(e){savePending();setStatus(e.message,true);toast(e.message);if(e.uncertain)online=false;return false}finally{busy=false;bar.dataset.busy='false'}
  }
  function versions(ids){const result={};for(const id of ids){const item=db.items.find(x=>x.id===id);if(!item)throw Error('记录已不存在，请刷新');result[id]=selectedVersions.has(id)?selectedVersions.get(id):item.version||0}return result}
  function change(action,ids,changes,onSuccess){ids=(ids||[]).map(String);try{return mutate(action,{ids,versions:versions(ids),...(changes?{changes}:{})},onSuccess)}catch(e){toast(e.message);return Promise.resolve(false)}}
@@ -118,16 +120,18 @@ function cloudItemTime(item){return Date.parse(item.inTimeIso||item.inTime||item
  async function manualRefresh(){if(busy||client.writing)return;try{await client.refresh();delay=5000}catch(e){failure(e)}}
  async function poll(){clearTimeout(timer);if(document.hidden)return;try{if(!busy&&!client.pending){const wasOnline=online;await client.check();online=!!client.snapshot;if(!wasOnline&&online)setStatus('连接已恢复 · 云端记录已核对');delay=5000}}catch(e){failure(e);delay=Math.min(delay*2,60000)}finally{if(session&&!document.hidden)timer=setTimeout(poll,delay)}}
  el('cloudRefresh').onclick=manualRefresh;
- el('cloudRetry').onclick=async()=>{if(busy)return;busy=true;try{const pending=client.pending,result=await client.retry();savePending();const recovered=recoverDraft(pending,result,currentPackingTaskV83,taskDirty);taskDirty=recovered.dirty;currentPackingTaskV83=recovered.draft;await client.refresh();renderCurrentPackingV83();toast('原请求已确认，请核对记录后再操作')}catch(e){savePending();failure(e)}finally{busy=false}};
+ el('cloudRetry').onclick=async()=>{if(busy)return;busy=true;try{const pending=client.pending,result=await client.retry();savePending();const recovered=recoverDraft(pending,result,currentPackingTaskV83,taskDirty);taskDirty=recovered.dirty;currentPackingTaskV83=recovered.draft;if(result.changes)void client.check().catch(failure);else await client.refresh();renderCurrentPackingV83();toast('原请求已确认，请核对记录后再操作')}catch(e){savePending();failure(e)}finally{busy=false}};
  document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden)poll()});
  window.addEventListener('beforeunload',e=>{if(taskDirty||client.pending){e.preventDefault();e.returnValue=''}});
  // Original backup/import entry remains visible and now performs preview only.
- importCsvData=async input=>{const file=input.files?.[0];input.value='';if(!file)return;if(!allowed('importData'))return toast('没有导入权限');try{const rows=parseCsv(await file.text());const plan=planCsvInventoryW93(rows,db.items);el('importResultV46').textContent='云端导入预览：'+importSummaryW93(plan)+'。当前仅预览，尚未提交云端。';toast('预览完成，未更改数据')}catch(e){toast('预览失败：'+e.message)}};
+ importCsvData=async input=>{const file=input.files?.[0];input.value='';if(!file)return;if(client.snapshot?.user.role!=='owner')return toast('只有最高管理员可以替换云端数据');migrationControl.show();const transfer=new DataTransfer();transfer.items.add(file);el('migrationCsv').files=transfer.files;el('migrationCsv').dispatchEvent(new Event('change'))};
  const safety=document.querySelector('.storageSafetyCardV44');if(safety){const note=document.createElement('p');note.textContent='同步开发版以云端为准，不读取原网页本地库存；断网时仅查看本次会话已读取的缓存。';safety.prepend(note)}
  el('storageStatusV44').textContent='云端同步模式：本地库存保存功能未启用';
  const migration=document.createElement('div');migration.className='card';migration.innerHTML='<div class="title">旧数据迁移预览与云端导出</div><p class="muted">先从原网页导出备份。这里仅预览，不导入、不覆盖已有云端记录。</p><label>选择原网页 JSON 备份<input id="cloudMigrationFile" type="file" accept=".json,application/json"></label><button id="cloudExport" class="gray">导出当前云端 JSON</button><pre id="cloudMigrationResult" style="white-space:pre-wrap"></pre>';
  el('backupTools').append(migration);
  el('cloudMigrationFile').onchange=async e=>{const file=e.target.files?.[0];e.target.value='';if(!file)return;if(!allowed('importData'))return toast('没有导入权限');try{if(file.size>20*1024*1024)throw Error('请先拆分超过20MB的备份');const r=migrationPreview(JSON.parse(await file.text()),db.items);el('cloudMigrationResult').textContent=JSON.stringify(r,null,2)+'\n仅预览：缺失历史时间不会自动补造；实际导入尚未开放。'}catch(error){toast(error.message)}};
  el('cloudExport').onclick=()=>{if(!allowed('exportData')||!online)return toast('请先连接并确认导出权限');const content={version:1,source:'native_v1',exportedAt:new Date().toISOString(),data:{items:client.snapshot.items,events:client.snapshot.events,tasks:client.snapshot.tasks}},url=URL.createObjectURL(new Blob([JSON.stringify(content,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='warehouse-cloud-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+ migrationControl=WarehouseMigration.mountMigration({client,request,sessionId:session?.sessionId||'no-session',canStart:()=>online&&!busy&&!client.pending&&!taskDirty,onMaintenance:()=>{online=false;setStatus('仓库维护中 · 请在备份工具中完成 CSV 导入，其他设备暂停提交',true)},onComplete:async s=>{if(s.phase==='complete'){currentPackingTaskV83=null;taskDirty=false;selectedVersions.clear();selectedFindIdsV64.clear();selectedPalletIds.clear();selectedDataIds.clear();renderCurrentPackingV83()}await manualRefresh()}});
+ document.addEventListener('click',e=>{if(client.maintenance&&!e.target.closest('#cloudMigrationPanel,.cloudBar')){e.preventDefault();e.stopImmediatePropagation();toast('仓库维护中，暂停业务操作，请等待导入完成')}},true);
  if(!session){setStatus('请先完成小程序授权登录',true);refresh()}else{try{const cache=JSON.parse(sessionStorage.getItem(cacheKey)||'null');if(cache?.sessionId===session.sessionId&&session.expiresAt>Date.now()){client.snapshot=cache.snapshot;publish(cache.snapshot);online=false;setStatus('正在核对连接，暂时显示本次会话的只读缓存',true)}}catch{}manualRefresh().then(()=>{if(session)timer=setTimeout(poll,5000)})}
 })();

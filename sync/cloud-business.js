@@ -1,6 +1,7 @@
 'use strict';
 function cloudIdArg(id){return JSON.stringify(String(id)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function cloudItemTime(item){return Date.parse(item.inTimeIso||item.inTime||item.createdAt||'')||0}
+async function cloudReadResult(response){try{return await response.json()}catch{const hint=response.status===413?'上传请求被拒绝，可能超过接口大小限制':response.status===504?'云函数或网关超时':response.status>=500?'云函数或网关异常':'接口返回了无法识别的内容';throw Object.assign(Error(hint+'（HTTP '+response.status+'，非JSON响应）。结果未确认，请保留当前文件和任务。'),{uncertain:true,httpStatus:response.status})}}
 (function(){
  const el=id=>document.getElementById(id),sessionKey='warehouseWebSessionV1',pendingKey='warehouseWebPendingV1',cacheKey='warehouseWebReadCacheV1';
  let session=null,online=false,busy=false,timer=null,delay=5000,editingVersion=null,selectedVersions=new Map(),taskDirty=false,authoritative='',backgroundPaint=false,taskItemVersions={};
@@ -14,8 +15,9 @@ function cloudItemTime(item){return Date.parse(item.inTimeIso||item.inTime||item
  async function request(action,args={}){
   if(!session||session.expiresAt<=Date.now())throw Object.assign(Error('请先在连接页获取登录码并由小程序授权'),{code:'ACCESS_DENIED'});
   let r,result;
-  try{r=await fetch(session.endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.secret,'X-Session-Id':session.sessionId},body:JSON.stringify({action,args}),cache:'no-store',signal:AbortSignal.timeout(20000)});result=await r.json()}
-  catch(e){throw Object.assign(Error('网络未确认，保留当前内容；请恢复连接后重试'),{uncertain:true})}
+  try{r=await fetch(session.endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.secret,'X-Session-Id':session.sessionId},body:JSON.stringify({action,args}),cache:'no-store',signal:AbortSignal.timeout(20000)})}
+  catch(e){const detail=e.name==='TimeoutError'||e.name==='AbortError'?'请求等待超过20秒':String(e.name||'Error')+': '+String(e.message||'请求失败');throw Object.assign(Error('请求未取得响应（'+detail+'）。保留当前文件；请查看浏览器控制台以区分跨域、网关和连接错误。'),{uncertain:true})}
+  result=await cloudReadResult(r);
   if(!result.ok){const error=Object.assign(Error(result.message||'请求未完成'),{code:result.code,uncertain:r.status>=500});if(error.code==='ACCESS_DENIED'){online=false;sessionStorage.removeItem(sessionKey);sessionStorage.removeItem(cacheKey);session=null;client.snapshot=null;client.revision=null;db={items:[],packingHistory:[],outboundEvents:[],warehouseMaps:[]};currentPackingTaskV83=null;refresh();renderCurrentPackingV83();renderTaskList()}throw error}
   return result.data;
  }

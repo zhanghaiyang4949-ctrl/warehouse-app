@@ -2155,9 +2155,9 @@ input[type="checkbox"],input[type="radio"]{flex-shrink:0}
 <div class="inboundStickyPanelV61">
   <div id="inboundCurrentContext" class="inboundCurrentContext inboundCurrentContextV61">
     <div class="ctxTrackingW95"><span>待入库完整单号</span><b id="ctxExpressW95">未输入</b></div>
-    <div><span>当前客户</span><b id="ctxCustomer">未填写</b></div>
     <div><span>当前托盘</span><b id="ctxPallet">未填写</b></div>
     <div><span>当前日期</span><b id="ctxDate">未填写</b></div>
+    <div><span>当前客户</span><b id="ctxCustomer">未填写</b></div>
   </div>
 
   <div class="lastInboundW95" id="lastInboundW95"><b>上一条已入库：</b><span id="lastInboundDetailW95">暂无</span></div>
@@ -2167,7 +2167,28 @@ input[type="checkbox"],input[type="radio"]{flex-shrink:0}
   </div>
 </div>
 
-<br/><div class="title">② 客户名称（选填）</div>
+<br/><div class="title">② 托盘号</div>
+<div class="palletRow">
+<input id="palletInput" placeholder="扫描/输入托盘编号，如 A111"/>
+<label class="palletAssistLabel"><input checked="" id="palletAssist" type="checkbox"/>辅助</label>
+</div>
+
+<br/><div class="title">③ 入库日期</div>
+<div class="dateStepRow iosDateRow">
+  <button class="gray dateStepBtn" type="button" onclick="shiftInDate(-1)">← 前一天</button>
+
+  <div class="iosDateCenter">
+    <div id="inDateDisplay" class="iosDateDisplay">请选择日期</div>
+    <input id="inDate" class="iosHiddenDateInput" type="date" aria-label="入库日期">
+  </div>
+
+  <button class="gray dateStepBtn" type="button" onclick="shiftInDate(1)">后一天 →</button>
+</div>
+<div class="row" style="margin-top:6px">
+  <button class="gray" type="button" onclick="setToday()">今天</button>
+</div>
+
+<br/><div class="title">④ 客户名称（选填）</div>
 <div class="inboundThreeOneRow"><input id="inCustomer" enterkeyhint="done" placeholder="输入客户名称，可不填"/><button class="gray" onclick="clearCustomer()" type="button">清空</button></div>
 
 
@@ -2183,27 +2204,6 @@ input[type="checkbox"],input[type="radio"]{flex-shrink:0}
   </div>
 </details>
 
-
-<br/><div class="title">③ 托盘号</div>
-<div class="palletRow">
-<input id="palletInput" placeholder="扫描/输入托盘编号，如 A111"/>
-<label class="palletAssistLabel"><input checked="" id="palletAssist" type="checkbox"/>辅助</label>
-</div>
-
-<br/><div class="title">④ 入库日期</div>
-<div class="dateStepRow iosDateRow">
-  <button class="gray dateStepBtn" type="button" onclick="shiftInDate(-1)">← 前一天</button>
-
-  <div class="iosDateCenter">
-    <div id="inDateDisplay" class="iosDateDisplay">请选择日期</div>
-    <input id="inDate" class="iosHiddenDateInput" type="date" aria-label="入库日期">
-  </div>
-
-  <button class="gray dateStepBtn" type="button" onclick="shiftInDate(1)">后一天 →</button>
-</div>
-<div class="row" style="margin-top:6px">
-  <button class="gray" type="button" onclick="setToday()">今天</button>
-</div>
 
 <br/><div class="title">⑤ 入库备注（选填）</div>
 <div class="inboundThreeOneRow">

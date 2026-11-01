@@ -13,6 +13,11 @@
    for(const button of [...range.querySelectorAll('button')])actions.append(button);
    range.append(actions);
   }
+  for(const input of range?.querySelectorAll('input[type="datetime-local"]')||[]){
+   if(input.parentElement.classList.contains('data-time-input-shell'))continue;
+   const shell=document.createElement('span');shell.className='data-time-input-shell';
+   input.before(shell);shell.append(input);
+  }
   tools?.querySelector('.dataThreeBtnLine')?.classList.add('data-status-four');
   for(const button of document.querySelectorAll('#queryManageCardV72 button')){
    if(['saveQueryPasswordV72()','syncQueryDataNowV73(true)','exportQueryDataV72()','saveQuerySettingsV73()'].includes(button.getAttribute('onclick')))button.parentElement.classList.add('query-actions-equal');

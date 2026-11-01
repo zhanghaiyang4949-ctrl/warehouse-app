@@ -19,3 +19,9 @@
 #dataManageTools .dataTimeRangeV86 .data-time-separator{display:flex;align-items:center;justify-content:center;height:44px;color:#667d93;font-size:14px}
 #dataManageTools .dataTimeRangeV86 .data-time-actions{grid-column:1 / -1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:4px}
 #dataManageTools .dataTimeRangeV86 input{inline-size:100%;max-inline-size:100%;min-inline-size:0;border-radius:8px;text-overflow:ellipsis}
+
+/* Safari date widgets have native intrinsic widths. The shell owns the visible border. */
+#dataManageTools .dataTimeRangeV86 label{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch;padding:8px;overflow:visible}
+#dataManageTools .dataTimeRangeV86 .data-time-input-shell{display:flex;box-sizing:border-box;min-width:0;width:100%;max-width:100%;height:44px;overflow:hidden;border:1px solid #cfd5dc;border-radius:8px;background:#fff}
+#dataManageTools .dataTimeRangeV86 .data-time-input-shell input{appearance:none;-webkit-appearance:none;display:block;flex:1 1 0%;box-sizing:border-box;width:0;inline-size:0;min-width:0;min-inline-size:0;max-width:100%;max-inline-size:100%;height:42px;min-height:0;margin:0;padding:8px 4px;border:0;border-radius:0;background:transparent;box-shadow:none;outline:0}
+#dataManageTools .dataTimeRangeV86 .data-time-input-shell:focus-within{outline:2px solid #7da5fa;outline-offset:1px}

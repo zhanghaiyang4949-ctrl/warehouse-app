@@ -1,0 +1,751 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>快递高清扫码 V5</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b121a;color:#f3f6fa;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+main{max-width:620px;margin:auto;padding:14px}
+h2{margin:6px 0;font-size:23px}
+.muted{color:#a8b7c5;font-size:13px;line-height:1.5}
+.camera{position:relative;width:100%;height:min(65vh,560px);min-height:340px;background:#000;border-radius:16px;overflow:hidden;margin:14px 0}
+video{position:absolute;width:100%;height:100%;object-fit:cover}
+.guide{position:absolute;inset:12%;border:2px solid #39e58a;border-radius:14px;pointer-events:none}
+.scanline{position:absolute;left:12%;right:12%;top:48%;height:2px;background:#36e88a;box-shadow:0 0 14px #36e88a;pointer-events:none}
+.cameraLabel{position:absolute;bottom:12px;left:10px;right:10px;text-align:center;font-size:12px;color:white;background:#0009;border-radius:20px;padding:7px}
+button{border:0;border-radius:10px;background:#344456;color:white;padding:12px 8px;font-size:14px;font-weight:600}
+button:disabled{opacity:.4}
+.primary{background:#16895b}
+.danger{background:#963e47}
+.controls,.options{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:10px 0}
+.hidden{display:none!important}
+.panel{background:#1c2a37;padding:14px;border-radius:13px;margin:15px 0}
+#last{color:#66e8a3;font-size:23px;font-weight:bold;margin:8px 0;overflow-wrap:anywhere}
+.header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.record{padding:11px 0;border-bottom:1px solid #344354;overflow-wrap:anywhere}
+.record small{display:block;color:#9aabba;margin-top:4px}
+#status,#info,#quality{margin:8px 0;line-height:1.5}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.stat{background:#263747;border-radius:10px;padding:10px 4px}
+.stat strong{display:block;color:#67e8a3;font-size:22px}
+.stat small{font-size:11px;color:#b5c3d0}
+.settings{display:grid;gap:12px}
+.settings label{font-size:14px}
+.settings select,.settings input[type=number]{
+ background:#101c28;color:white;border:1px solid #4a5a6a;
+ border-radius:8px;padding:9px;font-size:14px;max-width:100%;
+}
+.settings input[type=checkbox]{width:18px;height:18px;vertical-align:middle}
+.settingsRow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.exportButtons{display:flex;flex-wrap:wrap;gap:7px}
+.exportButtons button{flex:1}
+#quality.warning{color:#ffcb73}
+#quality.good{color:#7be6a7}
+</style>
+</head>
+<body>
+<main>
+<h2>快递高清扫码 V5</h2>
+<div class="muted">ZXing · 智能多方向识别 · iPhone Safari</div>
+
+<div class="camera">
+ <video id="video" autoplay muted playsinline></video>
+ <div class="guide"></div>
+ <div class="scanline"></div>
+ <div class="cameraLabel">全画面识别 · 条码可横放、竖放或倒放</div>
+</div>
+
+<div id="status" class="muted">点击开始扫描</div>
+<div id="info" class="muted"></div>
+<div id="quality" class="muted"></div>
+
+<div class="options">
+ <button id="z1" class="hidden">1×</button>
+ <button id="z15" class="hidden">1.5×</button>
+ <button id="z2" class="hidden">2×</button>
+ <button id="torch" class="hidden">手电筒</button>
+</div>
+
+<div class="controls">
+ <button id="start" class="primary">开始</button>
+ <button id="pause" disabled>暂停</button>
+ <button id="resume" disabled>继续</button>
+ <button id="stop" disabled>停止</button>
+</div>
+
+<div class="panel" aria-live="polite">
+ <div class="muted">最近识别单号</div>
+ <div id="last">等待扫描...</div>
+ <div id="format" class="muted"></div>
+</div>
+
+<div class="panel">
+ <div class="stats">
+  <div class="stat"><strong id="count">0</strong><small>成功记录</small></div>
+  <div class="stat"><strong id="duplicateCount">0</strong><small>重复拦截</small></div>
+  <div class="stat"><strong id="invalidCount">0</strong><small>规则拦截</small></div>
+ </div>
+</div>
+
+<div class="panel settings">
+ <strong>仓库扫描设置</strong>
+
+ <div class="settingsRow">
+  <label for="batchMode">整批扫描不重复</label>
+  <input type="checkbox" id="batchMode">
+ </div>
+
+ <div class="settingsRow">
+  <label for="validation">单号校验</label>
+  <select id="validation">
+   <option value="basic">基础校验（推荐）</option>
+   <option value="digits">只允许数字</option>
+   <option value="length">限制单号长度</option>
+  </select>
+ </div>
+
+ <div class="settingsRow hidden" id="lengthRow">
+  <label for="minLength">最短长度</label>
+  <input id="minLength" type="number" min="1" max="100" value="8">
+  <label for="maxLength">最长长度</label>
+  <input id="maxLength" type="number" min="1" max="100" value="40">
+ </div>
+
+ <div class="muted">EAN-13 自动验证校验位。其他格式默认不强制限制长度，避免误拦截真实快递单号。</div>
+</div>
+
+<div class="header">
+ <h3>扫描记录</h3>
+ <button id="clear" class="danger">清空</button>
+</div>
+
+<div class="exportButtons">
+ <button id="copyAll">复制全部</button>
+ <button id="exportTxt">导出 TXT</button>
+ <button id="exportCsv">导出 CSV</button>
+</div>
+
+<div id="records"></div>
+</main>
+
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const video=$("video");
+
+let reader=null,stream=null,track=null;
+let running=false,paused=false,busy=false,torchOn=false;
+let audioCtx=null,loopId=0,processing=false;
+let lastDecodeTime=0,lastQualityTime=0;
+let preferredAngle=0,decodeFailures=0,angleIndex=0;
+let decodeWidth=1280,averageDecodeMs=0;
+let duplicateCount=0,invalidCount=0;
+let lastSuccessTime=0;
+let qualityBadCount=0;
+
+const records=[];
+const lastSeen=new Map();
+const batchSeen=new Set();
+const DUP_MS=3000;
+const angles=[0,90,180,270];
+
+const canvas=document.createElement("canvas");
+const ctx=canvas.getContext("2d",{willReadFrequently:true});
+const rotated=document.createElement("canvas");
+const rctx=rotated.getContext("2d",{willReadFrequently:true});
+
+function status(s){$("status").textContent=s}
+
+function buttons(){
+ $("start").disabled=running||busy;
+ $("pause").disabled=!running||paused||busy;
+ $("resume").disabled=!running||!paused||busy;
+ $("stop").disabled=!running||busy;
+}
+
+function beep(type="success"){
+ try{
+  if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==="suspended")audioCtx.resume();
+
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+
+  o.type="sine";
+  o.frequency.value=type==="success"?950:type==="duplicate"?450:280;
+
+  g.gain.setValueAtTime(.12,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+.12);
+
+  o.connect(g);
+  g.connect(audioCtx.destination);
+  o.start();
+  o.stop(audioCtx.currentTime+.12);
+ }catch(e){}
+}
+
+function updateStats(){
+ $("count").textContent=records.length;
+ $("duplicateCount").textContent=duplicateCount;
+ $("invalidCount").textContent=invalidCount;
+}
+
+function render(){
+ updateStats();
+ $("records").replaceChildren();
+
+ records.forEach((r,i)=>{
+  const d=document.createElement("div");
+  d.className="record";
+
+  const t=document.createElement("div");
+  t.textContent=(i+1)+". "+r.text;
+
+  const s=document.createElement("small");
+  s.textContent=r.format+" · "+r.time;
+
+  d.append(t,s);
+  $("records").append(d);
+ });
+}
+
+function validEAN13(value){
+ if(!/^\d{13}$/.test(value))return false;
+ let sum=0;
+ for(let i=0;i<12;i++){
+  sum+=Number(value[i])*(i%2?3:1);
+ }
+ return (10-sum%10)%10===Number(value[12]);
+}
+
+function validateBarcode(text,format){
+ if(!text||!text.trim())return false;
+
+ if(format==="EAN_13"&&!validEAN13(text))return false;
+
+ const mode=$("validation").value;
+
+ if(mode==="digits"&&!/^\d+$/.test(text))return false;
+
+ if(mode==="length"){
+  const min=Number($("minLength").value)||1;
+  const max=Number($("maxLength").value)||100;
+  if(text.length<min||text.length>max)return false;
+ }
+
+ return true;
+}
+
+function isDuplicate(text){
+ const now=Date.now();
+
+ if($("batchMode").checked){
+  return batchSeen.has(text);
+ }
+
+ return now-(lastSeen.get(text)||0)<DUP_MS;
+}
+
+function success(result,angle){
+ const text=result.getText();
+ const format=String(result.getBarcodeFormat());
+ const now=Date.now();
+
+ // 防止同一个码持续停留在画面中产生大量提示
+ if(isDuplicate(text)){
+  if(now-lastSuccessTime>1000){
+   duplicateCount++;
+   updateStats();
+   lastSuccessTime=now;
+  }
+  return;
+ }
+
+ if(!validateBarcode(text,format)){
+  invalidCount++;
+  updateStats();
+  return;
+ }
+
+ lastSeen.set(text,now);
+ batchSeen.add(text);
+
+ for(const [key,time] of lastSeen){
+  if(now-time>DUP_MS)lastSeen.delete(key);
+ }
+
+ const time=new Date().toLocaleTimeString("zh-CN",{hour12:false});
+
+ records.unshift({text,format,time});
+ $("last").textContent=text;
+ $("format").textContent=format+" · "+time+" · 方向 "+angle+"°";
+
+ preferredAngle=angle;
+ decodeFailures=0;
+ lastSuccessTime=now;
+
+ render();
+ beep("success");
+
+ if(navigator.vibrate)navigator.vibrate(80);
+
+ status("识别成功 · 继续扫描中");
+}
+
+function caps(){
+ try{return track?.getCapabilities?.()||{}}catch(e){return {}}
+}
+
+function settings(){
+ try{return track?.getSettings?.()||{}}catch(e){return {}}
+}
+
+function refresh(){
+ const s=settings(),c=caps();
+
+ $("info").textContent=
+ "分辨率："+(s.width||"?")+"×"+(s.height||"?")+
+ " · 变焦："+(s.zoom||1)+"×"+
+ " · 对焦："+(s.focusMode||"自动/未知")+
+ " · 解码宽度："+decodeWidth;
+
+ ["z1","z15","z2","torch"].forEach(id=>$(id).classList.add("hidden"));
+
+ if(!running)return;
+
+ if(c.torch===true)$("torch").classList.remove("hidden");
+
+ if(c.zoom){
+  [["z1",1],["z15",1.5],["z2",2]].forEach(([id,v])=>{
+   if(v>=c.zoom.min&&v<=c.zoom.max){
+    $(id).classList.remove("hidden");
+   }
+  });
+ }
+}
+
+async function advanced(data){
+ if(!track)return false;
+ try{
+  await track.applyConstraints({advanced:[data]});
+  refresh();
+  return true;
+ }catch(e){
+  return false;
+ }
+}
+
+async function zoom(v){
+ if(!await advanced({zoom:v})){
+  status("Safari 不支持当前变焦倍率");
+ }
+}
+
+$("z1").onclick=()=>zoom(1);
+$("z15").onclick=()=>zoom(1.5);
+$("z2").onclick=()=>zoom(2);
+
+async function optimize(){
+ const c=caps();
+
+ if(Array.isArray(c.focusMode)&&c.focusMode.includes("continuous")){
+  await advanced({focusMode:"continuous"});
+ }
+
+ if(c.zoom&&c.zoom.min<=2&&c.zoom.max>=2){
+  await advanced({zoom:2});
+ }
+
+ refresh();
+}
+
+function makeRotated(source,angle){
+ const w=source.width,h=source.height;
+
+ if(angle===90||angle===270){
+  rotated.width=h;
+  rotated.height=w;
+ }else{
+  rotated.width=w;
+  rotated.height=h;
+ }
+
+ rctx.setTransform(1,0,0,1,0,0);
+ rctx.clearRect(0,0,rotated.width,rotated.height);
+ rctx.translate(rotated.width/2,rotated.height/2);
+ rctx.rotate(angle*Math.PI/180);
+ rctx.drawImage(source,-w/2,-h/2);
+ rctx.setTransform(1,0,0,1,0,0);
+
+ return rotated;
+}
+
+function decodeCanvas(source){
+ const luminance=new ZXing.HTMLCanvasElementLuminanceSource(source);
+ const bitmap=new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminance));
+ return reader.decode(bitmap);
+}
+
+function getScanAngles(){
+ if(decodeFailures<5){
+  return [preferredAngle];
+ }
+
+ const others=angles.filter(a=>a!==preferredAngle);
+ const alternate=others[Math.floor(decodeFailures/5)%others.length];
+
+ return [preferredAngle,alternate];
+}
+
+function updatePerformance(ms){
+ averageDecodeMs=averageDecodeMs
+  ?averageDecodeMs*.85+ms*.15
+  :ms;
+
+ let next=decodeWidth;
+
+ if(averageDecodeMs>200&&decodeWidth>960){
+  next=960;
+ }else if(averageDecodeMs<70&&decodeWidth<1600){
+  next=Math.min(1600,decodeWidth+160);
+ }
+
+ if(next!==decodeWidth){
+  decodeWidth=next;
+  refresh();
+ }
+}
+
+function estimateSharpness(source){
+ const w=source.width,h=source.height;
+ const data=ctx.getImageData(0,0,w,h).data;
+
+ let sum=0,n=0;
+
+ for(let y=6;y<h-6;y+=16){
+  for(let x=6;x<w-10;x+=16){
+   const i=(y*w+x)*4;
+   const j=(y*w+x+5)*4;
+
+   const a=data[i]*.299+data[i+1]*.587+data[i+2]*.114;
+   const b=data[j]*.299+data[j+1]*.587+data[j+2]*.114;
+
+   sum+=Math.abs(a-b);
+   n++;
+  }
+ }
+
+ return n?sum/n:0;
+}
+
+function checkQuality(){
+ const score=estimateSharpness(canvas);
+
+ if(score<5){
+  qualityBadCount++;
+ }else{
+  qualityBadCount=0;
+ }
+
+ if(qualityBadCount>=3){
+  $("quality").textContent="画面可能偏模糊，请稍微调整距离并保持稳定";
+  $("quality").className="warning";
+ }else if(score>=5){
+  $("quality").textContent="画面清晰度参考：正常";
+  $("quality").className="good";
+ }
+}
+
+function scanLoop(token){
+ if(token!==loopId||!running||paused)return;
+
+ requestAnimationFrame(()=>{
+  if(token!==loopId||!running||paused)return;
+
+  if(processing){
+   scanLoop(token);
+   return;
+  }
+
+  const now=performance.now();
+
+  if(now-lastDecodeTime<100){
+   scanLoop(token);
+   return;
+  }
+
+  lastDecodeTime=now;
+
+  if(video.readyState<2||!video.videoWidth){
+   scanLoop(token);
+   return;
+  }
+
+  processing=true;
+
+  try{
+   const scale=Math.min(1,decodeWidth/video.videoWidth);
+   canvas.width=Math.round(video.videoWidth*scale);
+   canvas.height=Math.round(video.videoHeight*scale);
+
+   ctx.drawImage(video,0,0,canvas.width,canvas.height);
+
+   if(now-lastQualityTime>1800){
+    lastQualityTime=now;
+    checkQuality();
+   }
+
+   const attempts=getScanAngles();
+   let result=null;
+   let successAngle=0;
+
+   const startTime=performance.now();
+
+   for(const angle of attempts){
+    try{
+     const source=angle===0?canvas:makeRotated(canvas,angle);
+     result=decodeCanvas(source);
+
+     if(result){
+      successAngle=angle;
+      break;
+     }
+    }catch(e){}
+   }
+
+   updatePerformance(performance.now()-startTime);
+
+   if(result){
+    success(result,successAngle);
+   }else{
+    decodeFailures++;
+   }
+
+  }catch(e){
+   decodeFailures++;
+  }finally{
+   processing=false;
+   scanLoop(token);
+  }
+ });
+}
+
+$("start").onclick=async()=>{
+ if(running||busy)return;
+
+ busy=true;
+ buttons();
+ status("正在启动高清后置摄像头...");
+
+ try{
+  if(!window.ZXing)throw Error("ZXing 加载失败，请检查网络");
+
+  const hints=new Map();
+
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+   ZXing.BarcodeFormat.CODE_128,
+   ZXing.BarcodeFormat.CODE_39,
+   ZXing.BarcodeFormat.EAN_13,
+   ZXing.BarcodeFormat.QR_CODE
+  ]);
+
+  hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+
+  reader=new ZXing.MultiFormatReader();
+  reader.setHints(hints);
+
+  if(!audioCtx){
+   audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  }
+
+  await audioCtx.resume();
+
+  stream=await navigator.mediaDevices.getUserMedia({
+   audio:false,
+   video:{
+    facingMode:{ideal:"environment"},
+    width:{ideal:1920},
+    height:{ideal:1080},
+    frameRate:{ideal:30}
+   }
+  });
+
+  track=stream.getVideoTracks()[0];
+  video.srcObject=stream;
+  await video.play();
+
+  running=true;
+  paused=false;
+
+  await optimize();
+
+  status("扫描中 · 智能方向识别 · 自动变焦");
+  scanLoop(++loopId);
+
+ }catch(e){
+  status("启动失败："+(e?.message||e));
+
+  if(stream)stream.getTracks().forEach(t=>t.stop());
+
+  stream=null;
+  track=null;
+  running=false;
+ }finally{
+  busy=false;
+  buttons();
+ }
+};
+
+$("pause").onclick=()=>{
+ if(!running||paused)return;
+ paused=true;
+ ++loopId;
+ status("已暂停");
+ buttons();
+};
+
+$("resume").onclick=()=>{
+ if(!running||!paused)return;
+ paused=false;
+ status("继续扫描中");
+ scanLoop(++loopId);
+ buttons();
+};
+
+$("stop").onclick=()=>{
+ if(!running)return;
+
+ ++loopId;
+
+ if(stream)stream.getTracks().forEach(t=>t.stop());
+
+ stream=null;
+ track=null;
+ video.srcObject=null;
+
+ running=false;
+ paused=false;
+ torchOn=false;
+
+ $("info").textContent="";
+ $("quality").textContent="";
+
+ refresh();
+ status("已停止");
+ buttons();
+};
+
+$("torch").onclick=async()=>{
+ const ok=await advanced({torch:!torchOn});
+
+ if(ok){
+  torchOn=!torchOn;
+  $("torch").textContent=torchOn?"关闭手电筒":"手电筒";
+ }else{
+  status("Safari 无法控制手电筒");
+  $("torch").classList.add("hidden");
+ }
+};
+
+$("validation").onchange=()=>{
+ $("lengthRow").classList.toggle(
+  "hidden",
+  $("validation").value!=="length"
+ );
+};
+
+$("batchMode").onchange=()=>{
+ if($("batchMode").checked){
+  records.forEach(r=>batchSeen.add(r.text));
+ }
+};
+
+$("clear").onclick=()=>{
+ if(!confirm("确定清空全部扫描记录？"))return;
+
+ records.length=0;
+ lastSeen.clear();
+ batchSeen.clear();
+
+ duplicateCount=0;
+ invalidCount=0;
+
+ $("last").textContent="等待扫描...";
+ $("format").textContent="";
+
+ render();
+};
+
+function downloadFile(filename,content,type){
+ const blob=new Blob([content],{type});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement("a");
+
+ a.href=url;
+ a.download=filename;
+ document.body.appendChild(a);
+ a.click();
+ a.remove();
+
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+$("copyAll").onclick=async()=>{
+ if(!records.length){
+  alert("暂无扫描记录");
+  return;
+ }
+
+ const text=records.map(r=>r.text).join("\n");
+
+ try{
+  await navigator.clipboard.writeText(text);
+  alert("已复制 "+records.length+" 条单号");
+ }catch(e){
+  alert("复制失败，请使用导出 TXT");
+ }
+};
+
+$("exportTxt").onclick=()=>{
+ if(!records.length){
+  alert("暂无扫描记录");
+  return;
+ }
+
+ downloadFile(
+  "快递扫码记录.txt",
+  records.map(r=>r.text).join("\n"),
+  "text/plain;charset=utf-8"
+ );
+};
+
+$("exportCsv").onclick=()=>{
+ if(!records.length){
+  alert("暂无扫描记录");
+  return;
+ }
+
+ const rows=[
+  ["单号","格式","时间"],
+  ...records.map(r=>[r.text,r.format,r.time])
+ ];
+
+ const csv=rows.map(row=>
+  row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")
+ ).join("\r\n");
+
+ downloadFile(
+  "快递扫码记录.csv",
+  "\uFEFF"+csv,
+  "text/csv;charset=utf-8"
+ );
+};
+
+render();
+buttons();
+</script>
+</body>
+</html>

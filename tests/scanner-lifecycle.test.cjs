@@ -1,0 +1,20 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+function fixture(){
+ const nodes=new Map();function el(){return {textContent:'',value:'basic',checked:false,disabled:false,className:'',style:{},classList:{add(){},remove(){},toggle(){}},getContext(){return {}},replaceChildren(){},append(){},setAttribute(){},querySelector(s){if(!nodes.has(s))nodes.set(s,el());return nodes.get(s)},querySelectorAll(){return []},remove(){this.removed=true},play:async()=>{},pause(){},readyState:0}};
+ let resolveMedia;const stream={stopped:0,getTracks(){return [{stop(){stream.stopped++}}]},getVideoTracks(){return [{getCapabilities(){return {}},getSettings(){return {}},applyConstraints:async()=>{}}]}};
+ const document={createElement:el,body:{append(){},style:{}},activeElement:null};const win={document,navigator:{mediaDevices:{getUserMedia:()=>new Promise(r=>resolveMedia=r)}},isSecureContext:true,ZXing:{DecodeHintType:{},BarcodeFormat:{},MultiFormatReader:class{setHints(){}reset(){}}},requestAnimationFrame(){return 1},cancelAnimationFrame(){},performance:{now:()=>Date.now()},setTimeout,clearTimeout,Map,Set,Date,console};win.window=win;win.globalThis=win;
+ vm.runInNewContext(fs.readFileSync('assets/scanner/scanner.js','utf8').replace('})(window);','window.__testSuccess=success;window.__testZoom=zoom;})(window);'),win);
+ return {api:win.V5Scanner,win,stream,resolve:()=>resolveMedia(stream),nodes};
+}
+const tick=()=>new Promise(r=>setImmediate(r));
+test('授权期间关闭，迟到的摄像头流必须释放',async()=>{const f=fixture();f.api.openScanner({mode:'single'});const p=f.api.startScanner();await tick();f.api.closeScanner();f.resolve();await p;assert.equal(f.stream.stopped,1);assert.equal(f.api.isOpen(),false)});
+test('重复启动只请求一次，关闭10次均释放',async()=>{const f=fixture();for(let i=0;i<10;i++){f.api.openScanner({mode:'single'});const p=f.api.startScanner();await tick();const q=f.api.startScanner();f.resolve();await Promise.all([p,q]);f.api.pauseScanner();f.api.resumeScanner();f.api.closeScanner()}assert.equal(f.stream.stopped,10)});
+test('旧会话授权迟到不得停止新会话',async()=>{const f=fixture();f.api.openScanner({});const p=f.api.startScanner();await tick();f.api.closeScanner();f.api.openScanner({});f.resolve();await p;assert.equal(f.api.isOpen(),true);assert.equal(f.stream.stopped,1);f.api.closeScanner()});
+
+async function started(){const f=fixture();f.api.openScanner({mode:'continuous'});const p=f.api.startScanner();await tick();f.resolve();await p;return f}
+const result=(text,format=0)=>({getText:()=>text,getBarcodeFormat:()=>format});
+test('单次成功只回调一次并完全释放',async()=>{const f=fixture();let calls=0;f.api.openScanner({mode:'single',onResult:r=>{calls++;assert.equal(r.text,'001-ABC');assert.equal(typeof r.timestamp,'number')}});const p=f.api.startScanner();await tick();f.resolve();await p;f.win.__testSuccess(result('001-ABC'),0);f.win.__testSuccess(result('001-ABC'),0);assert.equal(calls,1);assert.equal(f.stream.stopped,1);assert.equal(f.api.isOpen(),false)});
+test('连续重复拦截，停止后窗口可重新开始',async()=>{const f=fixture();let n=0;f.api.openScanner({mode:'continuous',batch:true,onResult:()=>{n++}});const p=f.api.startScanner();await tick();f.resolve();await p;f.win.__testSuccess(result('ABC'),0);f.win.__testSuccess(result('ABC'),0);f.win.__testSuccess(result('DEF'),90);assert.equal(n,2);assert.equal(f.api.isOpen(),true);f.api.stopScanner();assert.equal(f.stream.stopped,1);assert.equal(f.api.isOpen(),true);f.api.closeScanner()});
+test('页面失效后旧扫码结果不写入',async()=>{const f=fixture();let current=true,n=0;f.api.openScanner({mode:'continuous',isCurrent:()=>current,onResult:()=>n++});const p=f.api.startScanner();await tick();f.resolve();await p;current=false;f.win.__testSuccess(result('ABC'),0);assert.equal(n,0);assert.equal(f.api.isOpen(),false);assert.equal(f.stream.stopped,1)});
+
+test('旧变焦请求完成不污染重新打开的扫码窗口',async()=>{const f=await started();const p=f.win.__testZoom(2);f.api.closeScanner();f.api.openScanner({});await p;assert.equal(f.nodes.get('[data-v5="status"]').textContent.includes('不支持'),false);f.api.closeScanner()});

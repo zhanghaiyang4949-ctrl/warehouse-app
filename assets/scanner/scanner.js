@@ -37,7 +37,7 @@ function release(s){if(s)s.getTracks().forEach(t=>t.stop())}
 function stopScanner(){
  session++;loopId++;release(stream);stream=null;track=null;if(video){video.pause();video.srcObject=null}
  running=false;paused=false;busy=false;torchOn=false;reader?.reset();reader=null;processing=false;
- if(layer){$('info').textContent='';$('quality').textContent='';$('torch').textContent='手电筒';refresh();status('已停止，点击开始可继续');buttons()}
+ if(layer){$('info').textContent='';$('quality').textContent='';$('torch').textContent='手电筒';refresh();status('已停止，点击重试可重新开启摄像头');buttons()}
 }
 function closeScanner(){stopScanner();if(layer){layer.remove();layer=null;options=null;document.body.style.overflow=oldOverflow;previousFocus?.focus?.();video=null}}
 function isCurrent(){return !!layer&&layer.isConnected!==false&&!!options&&(!options.isCurrent||options.isCurrent())}
@@ -64,12 +64,13 @@ function openScanner(config={}){
  closeScanner();options={mode:'single',...config};previousFocus=document.activeElement;oldOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
  lastSeen.clear();batchSeen.clear();records.length=0;preferredAngle=0;decodeFailures=0;decodeWidth=1280;averageDecodeMs=0;lastDecodeTime=0;lastQualityTime=0;qualityBadCount=0;
  layer=document.createElement('div');layer.className='v5-scanner-layer';
- layer.innerHTML='<section class="v5-scanner-dialog" role="dialog" aria-modal="true" aria-label="高清扫码"><header><strong data-v5="title"></strong><button type="button" data-v5="close">关闭</button></header><div class="v5-camera"><video data-v5="video" autoplay muted playsinline></video><div class="v5-guide"></div><span>全画面识别 · 可横放、竖放或倒放</span></div><div class="v5-status" data-v5="status" role="status">点击开始，允许使用摄像头</div><div class="v5-result"><strong data-v5="last">等待扫描</strong><small data-v5="format"></small><span>本次成功 <b data-v5="count">0</b> 次</span></div><div class="v5-controls"><button type="button" data-v5="start">开始</button><button type="button" data-v5="pause">暂停</button><button type="button" data-v5="resume">继续</button><button type="button" data-v5="stop">停止</button></div><div class="v5-controls v5-options"><button type="button" data-v5="z1" class="hidden">1×</button><button type="button" data-v5="z15" class="hidden">1.5×</button><button type="button" data-v5="z2" class="hidden">2×</button><button type="button" data-v5="torch" class="hidden">手电筒</button></div><small data-v5="quality"></small><small data-v5="info"></small></section>';
+ layer.innerHTML='<section class="v5-scanner-dialog" role="dialog" aria-modal="true" aria-label="高清扫码"><header><strong data-v5="title"></strong><button type="button" data-v5="close">关闭</button></header><div class="v5-camera"><video data-v5="video" autoplay muted playsinline></video><div class="v5-guide"></div><span>全画面识别 · 可横放、竖放或倒放</span></div><div class="v5-status" data-v5="status" role="status">正在准备摄像头…</div><div class="v5-result"><strong data-v5="last">等待扫描</strong><small data-v5="format"></small><span>本次成功 <b data-v5="count">0</b> 次</span></div><div class="v5-controls"><button type="button" data-v5="start">重试</button><button type="button" data-v5="pause">暂停</button><button type="button" data-v5="resume">继续</button><button type="button" data-v5="stop">停止</button></div><div class="v5-controls v5-options"><button type="button" data-v5="z1" class="hidden">1×</button><button type="button" data-v5="z15" class="hidden">1.5×</button><button type="button" data-v5="z2" class="hidden">2×</button><button type="button" data-v5="torch" class="hidden">手电筒</button></div><small data-v5="quality"></small><small data-v5="info"></small></section>';
  document.body.append(layer);video=$('video');$('title').textContent=config.title||'高清扫码';
  $('close').onclick=closeScanner;$('start').onclick=startScanner;$('pause').onclick=pauseScanner;$('resume').onclick=resumeScanner;$('stop').onclick=stopScanner;
  $('z1').onclick=()=>zoom(1);$('z15').onclick=()=>zoom(1.5);$('z2').onclick=()=>zoom(2);
  $('torch').onclick=async()=>{const token=session;const ok=await advanced({torch:!torchOn});if(!layer||token!==session)return;if(ok){torchOn=!torchOn;$('torch').textContent=torchOn?'关闭手电筒':'手电筒'}else{status('当前设备不支持手电筒');$('torch').classList.add('hidden')}};
  buttons();$('close').focus?.();
+ if(config.autoStart!==false)return startScanner();
 }
 root.V5Scanner={openScanner,startScanner,pauseScanner,resumeScanner,stopScanner,closeScanner,isOpen:()=>!!layer,isCurrent};
 function beep(type="success"){

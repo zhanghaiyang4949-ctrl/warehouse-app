@@ -1,0 +1,17 @@
+/* Existing warehouse palette/type retained. Explicit grids keep phone controls aligned. */
+#dataManageTools .dataSearchLine{display:grid;grid-template-columns:minmax(0,3fr) repeat(3,minmax(0,1fr));gap:6px;align-items:stretch}
+#dataManageTools .dataSearchLine>*{box-sizing:border-box;width:100%!important;min-width:0!important;max-width:100%;margin:0;font-size:14px!important;min-height:44px;padding:8px 5px!important}
+#dataManageTools .dataSearchLine input{font-size:16px!important;padding-left:10px!important}
+#dataManageTools .dataTimeRangeV86{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:end}
+#dataManageTools .dataTimeRangeV86>*{box-sizing:border-box;min-width:0;max-width:100%}
+#dataManageTools .dataTimeRangeV86 label{display:flex;flex-direction:column;align-items:stretch;font-size:12px;gap:6px;overflow:hidden}
+#dataManageTools .dataTimeRangeV86 input{box-sizing:border-box;display:block;width:100%;min-width:0;max-width:100%;min-height:44px;font-size:16px;padding:8px 4px;overflow:hidden}
+#dataManageTools .dataTimeRangeV86 input::-webkit-date-and-time-value{min-width:0;text-align:left}
+#dataManageTools .dataTimeRangeV86 input::-webkit-datetime-edit{min-width:0;padding:0}
+#dataManageTools .dataTimeRangeV86 button{width:100%;font-size:13px!important;min-height:42px;padding:8px 4px!important}
+#dataManageTools .data-status-four{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+#dataManageTools .data-status-four button{box-sizing:border-box;min-width:0;width:100%;font-size:12px!important;line-height:1.4;padding:9px 3px!important;min-height:44px;white-space:normal;overflow-wrap:break-word}
+#queryManageCardV72 .query-actions-equal{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#queryManageCardV72 .query-actions-equal button{box-sizing:border-box;width:100%;min-width:0;font-size:14px!important;padding:10px 6px!important;min-height:44px;line-height:1.5}
+@media(max-width:360px){#dataManageTools .dataSearchLine{gap:4px}#dataManageTools .dataSearchLine button{font-size:12px!important}#dataManageTools .data-status-four{gap:4px}#dataManageTools .data-status-four button{font-size:11px!important}}
+@media(max-width:650px){#dataManageTools .dataTimeRangeV86 label{grid-column:1 / -1}}

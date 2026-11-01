@@ -3,7 +3,7 @@
 const targets={
  inExpress:{mode:'single',title:'入库扫码'},findInput:{mode:'single',title:'快速找货扫码'},
  batchFindInput:{mode:'continuous',title:'批量找货扫码',batch:true},
- packOrdersV83:{mode:'continuous',title:'配货单号扫码'},
+ packOrdersV83:{mode:'single',append:true,title:'配货单号扫码'},
  blindSortInputW99:{mode:'single',title:'盲扫分堆扫码',protect:true},
  tableSortInputW99:{mode:'single',title:'指定分堆扫码',protect:true},
  dataSearchInput:{mode:'single',title:'数据整理扫码'}
@@ -14,7 +14,7 @@ function applyScan(id,input,text,hooks={}){
  const lines=String(input.value).split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
  if(config.batch&&lines.includes(text.trim()))return {accepted:false,message:'重复单号，未追加'};
  const repeated=lines.includes(text.trim());
- input.value=config.mode==='continuous'?input.value+(input.value&&!/\n$/.test(input.value)?'\n':'')+text:text;
+ input.value=(config.append||config.mode==='continuous')?input.value+(input.value&&!/\n$/.test(input.value)?'\n':'')+text:text;
  if(typeof Event!=='undefined')input.dispatchEvent(new Event('input',{bubbles:true}));
  if(id==='packOrdersV83'&&hooks.count)hooks.count();
  if(id==='findInput'&&hooks.query)hooks.query();

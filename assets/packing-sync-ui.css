@@ -1,0 +1,14 @@
+.pack-selection-toolbar{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}
+.pack-selection-toolbar[hidden]{display:none}.pack-selection-toolbar>span{flex:1;min-width:100px;font-size:14px;color:#526f84}
+.pack-selection-toolbar button{width:auto;min-width:64px;min-height:42px;padding:8px 14px}
+#packMatchListV83>.pack-tap-row{position:relative;cursor:pointer;border:1px solid #dce5ef;border-radius:10px;padding:14px;margin:10px 0;background:#fff;min-width:0}
+#packMatchListV83>.pack-tap-row> b:first-child{display:block;padding-right:58px;overflow-wrap:anywhere}
+#packMatchListV83>.pack-tap-row[aria-pressed=true]{border:2px solid #245fc7;padding:13px;background:#eef5ff}
+#packMatchListV83>.pack-tap-row:focus-visible{outline:3px solid #7da5fa;outline-offset:2px}
+.pack-old-selection{display:none!important}
+.pack-selection-badge{position:absolute;top:12px;right:12px;font-size:12px;border-radius:6px;background:#edf2f8;color:#526f84;padding:4px 8px}
+.pack-tap-row[aria-pressed=true] .pack-selection-badge{background:#245fc7;color:white}
+#packMatchListV83 .packLineStateV86{display:block;margin-top:10px}
+#packMatchListV83 .packLineNoteV86{box-sizing:border-box;width:100%;min-width:0;font-size:16px}
+#storageStatusV44 .server-version-stale{color:#a04d00;font-weight:600}
+#storageStatusV44.server-version-stale{border-color:#e4bc78;background:#fff8e9}

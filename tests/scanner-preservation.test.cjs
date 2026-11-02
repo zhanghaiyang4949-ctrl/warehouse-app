@@ -1,7 +1,11 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),cp=require('node:child_process');
 const html=fs.readFileSync('index.html','utf8'),original=cp.execFileSync('git',['show','40c9302b6139c008d5f1cc36743921ce5df81f53:index.html'],{encoding:'utf8',maxBuffer:2e6});
-const scripts=s=>[...s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].filter(x=>! /\bsrc\s*=/.test(x[1])).map(x=>x[2]);
-test('所有原业务脚本逐字不变，数据库同步备份和小程序不改',()=>assert.deepEqual(scripts(html),scripts(original)));
+const scripts=s=>[...s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].filter(x=>! /\bsrc\s*=/.test(x[1])).map(x=>x[2].replace(/\r\n/g,'\n').replace(/[ \t]+(?=\r?$)/gm,''));
+test('原业务脚本仅增加服务器读取状态通知，数据协议和同步逻辑不变',()=>{
+ const publish="function publish(value){window.dispatchEvent(new CustomEvent('warehouse-remote-backup',{detail:{key:k,sha:value.sha,exportedAt:value.exportedAt||''}}));return value}";
+ const restored=html.replace(publish,'').replaceAll('return publish(remoteCache)','return remoteCache').replace("return publish({sha:'',db:null,exportedAt:''})","return {sha:'',db:null,exportedAt:''}");
+ assert.deepEqual(scripts(restored),scripts(original));
+});
 function fn(source,name){const start=source.indexOf('function '+name+'(');assert.ok(start>=0,name);let at=source.indexOf('{',start),n=1,i=at+1;for(;n;i++){if(source[i]==='{')n++;if(source[i]==='}')n--}return source.slice(start,i)}
 const demo=fs.readFileSync('docs/v5-demo-original.html','utf8'),engine=fs.readFileSync('assets/scanner/scanner.js','utf8');
 for(const name of ['validEAN13','makeRotated','decodeCanvas','getScanAngles','updatePerformance','estimateSharpness','checkQuality','scanLoop'])test('沿用 V5 原算法 '+name,()=>assert.equal(fn(engine,name),fn(demo,name)));

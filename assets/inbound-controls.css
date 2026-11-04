@@ -1,0 +1,25 @@
+#in .inbound-pallet-controls {
+ display: grid;
+ grid-template-columns: minmax(0, 3fr) repeat(3, minmax(0, 1fr));
+ gap: 4px;
+ align-items: stretch;
+}
+#in .inbound-pallet-controls > *, #in .inbound-customer-controls > * {
+ box-sizing: border-box;
+ width: 100% !important;
+ min-width: 0 !important;
+ min-height: 44px;
+ margin: 0;
+}
+#in .inbound-pallet-controls button { padding: 6px 2px !important; font-size: 13px !important; }
+#in .inbound-pallet-controls .palletAssistLabel { justify-content: center; padding: 2px !important; gap: 2px; }
+#in .inbound-customer-controls { grid-template-columns: minmax(0, 1fr) 52px 65px; gap: 4px; }
+#in .customer-uppercase { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; white-space: nowrap; }
+#in .customer-uppercase input { width: 15px; min-width: 15px; min-height: 0; margin: 0; accent-color: #245fc7; }
+#in .customer-uppercase input {
+ appearance: none; -webkit-appearance: none; flex: 0 0 26px; width: 26px;
+ height: 16px; padding: 2px; border: 0; border-radius: 10px; background: #8292a4;
+}
+#in .customer-uppercase input::before { content: ''; display: block; width: 12px; height: 12px; border-radius: 50%; background: white; }
+#in .customer-uppercase input:checked { background: #245fc7; }
+#in .customer-uppercase input:checked::before { transform: translateX(10px); }

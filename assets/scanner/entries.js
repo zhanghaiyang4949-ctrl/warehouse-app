@@ -1,6 +1,7 @@
 (function(root){
 'use strict';
 const targets={
+ palletInput:{mode:'single',title:'托盘号扫码'},
  inExpress:{mode:'single',title:'入库扫码'},findInput:{mode:'single',title:'快速找货扫码'},
  batchFindInput:{mode:'continuous',title:'批量找货扫码',batch:true},
  packOrdersV83:{mode:'single',append:true,title:'配货单号扫码'},
@@ -26,8 +27,11 @@ function visible(el){return !!el&&el.isConnected&&el.getClientRects().length>0}
 function install(){
  for(const [id,config] of Object.entries(targets)){
   const input=document.getElementById(id);if(!input)continue;
-  const button=document.createElement('button');button.type='button';button.className='gray v5-entry-button';button.textContent='扫码';button.dataset.v5Target=id;
-  input.insertAdjacentElement('afterend',button);
+  let button=input.parentElement.querySelector('[data-v5-target="'+id+'"]');
+  if(!button){
+   button=document.createElement('button');button.type='button';button.className='gray v5-entry-button';button.textContent='扫码';button.dataset.v5Target=id;
+   input.insertAdjacentElement('afterend',button);
+  }
   button.onclick=()=>{
    if(config.protect&&input.value.trim()){root.toast('请先确认或清空原单号，再扫码');return}
    root.V5Scanner.openScanner({mode:config.mode,title:config.title,batch:!!config.batch,

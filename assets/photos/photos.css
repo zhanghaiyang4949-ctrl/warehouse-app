@@ -1,0 +1,31 @@
+.warehouse-photo-panel{grid-column:1 / -1;min-width:0;margin-top:12px;padding-top:10px;border-top:1px solid #e1e8f1;text-align:left}
+.warehouse-photo-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:14px;font-weight:600}
+.warehouse-photo-heading button{width:auto!important;min-width:88px;min-height:40px;font-size:13px!important;padding:8px 10px!important}
+.warehouse-photo-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.warehouse-photo-thumb{display:flex;flex-direction:column;align-items:center;box-sizing:border-box;width:88px!important;max-width:100%;padding:4px!important;background:#f7faff;border:1px solid #dce6f1;border-radius:8px;font:inherit;color:#38566b;overflow:hidden}
+.warehouse-photo-thumb img{display:block;width:78px;height:68px;object-fit:cover;border-radius:5px;background:#e9eff7;font-size:11px}
+.warehouse-photo-thumb small{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;line-height:1.8}
+.warehouse-photo-editor,.warehouse-photo-viewer{position:fixed;inset:0;z-index:120000;background:#0009;display:flex;align-items:center;justify-content:center;padding:14px;box-sizing:border-box}
+.warehouse-photo-editor>section{box-sizing:border-box;width:min(100%,600px);max-height:calc(100dvh - 28px);overflow:auto;background:#fff;border-radius:14px;padding:18px;color:#213f53}
+.warehouse-photo-editor header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.warehouse-photo-editor p{font-size:13px;line-height:1.6;color:#64778b}
+.warehouse-photo-editor button,.photo-file-button{box-sizing:border-box;min-height:44px;width:auto;padding:9px 14px;border:1px solid #cbd8e8;border-radius:8px;background:#eef4fc;color:#294d73;font:inherit}
+.warehouse-photo-editor footer button{width:100%;background:#245fc7;color:#fff}
+.warehouse-photo-actions{display:flex;gap:10px;margin:14px 0}
+.photo-file-button{display:inline-flex!important;align-items:center;justify-content:center;cursor:pointer;flex:1}
+.photo-file-button input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.warehouse-photo-edit-row{display:flex;align-items:center;gap:12px;border-top:1px solid #e7edf5;padding:12px 0}
+.warehouse-photo-edit-row input{box-sizing:border-box;min-width:0;width:100%;font-size:16px}
+.warehouse-photo-edit-row .warehouse-photo-thumb{flex:0 0 88px}
+.warehouse-photo-viewer{z-index:120001;flex-direction:column;background:#08121cf2;gap:12px;color:#fff;overflow:auto;touch-action:pan-x pan-y pinch-zoom}
+.warehouse-photo-viewer>img{display:block;max-width:100%;max-height:78dvh;object-fit:contain;min-height:0}
+.warehouse-photo-viewer>button{align-self:flex-end;min-height:44px;width:auto;background:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:16px}
+.warehouse-photo-viewer p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.photo-temporary-tracking{display:flex;align-items:center;gap:8px;margin:10px 0 0;font-size:13px;color:#526f84}
+.photo-temporary-tracking input{width:18px;min-width:18px;height:18px;margin:0;padding:0}
+.warehouse-photo-summary{display:flex;flex-direction:column;gap:7px;font-size:13px;margin-top:12px;border-top:1px solid #e1e8f1;padding-top:12px}
+.warehouse-photo-summary button{width:auto;align-self:flex-start}
+.photo-upload-progress{grid-column:1 / -1;display:flex;align-items:center;gap:12px;width:100%;font-size:13px}
+.photo-upload-progress span{flex:1;min-width:0}
+.photo-upload-progress button{min-width:80px!important;width:auto!important;min-height:40px!important}
+@media(max-width:650px){.warehouse-photo-editor{padding:8px}.warehouse-photo-editor>section{padding:14px;max-height:calc(100dvh - 16px)}.warehouse-photo-edit-row{gap:8px}}

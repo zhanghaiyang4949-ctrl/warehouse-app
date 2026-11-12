@@ -1,9 +1,14 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),cp=require('node:child_process');
 const html=fs.readFileSync('index.html','utf8'),original=cp.execFileSync('git',['show','40c9302b6139c008d5f1cc36743921ce5df81f53:index.html'],{encoding:'utf8',maxBuffer:2e6});
 const scripts=s=>[...s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].filter(x=>! /\bsrc\s*=/.test(x[1])).map(x=>x[2].replace(/\r\n/g,'\n').replace(/[ \t]+(?=\r?$)/gm,''));
-test('原业务脚本仅增加服务器读取状态通知，数据协议和同步逻辑不变',()=>{
+test('扫码与非图片业务脚本保留，图片入库和同步恢复的预期改动已隔离',()=>{
  const publish="function publish(value){window.dispatchEvent(new CustomEvent('warehouse-remote-backup',{detail:{key:k,sha:value.sha,exportedAt:value.exportedAt||''}}));return value}";
- const restored=html.replace(publish,'').replaceAll('return publish(remoteCache)','return remoteCache').replace("return publish({sha:'',db:null,exportedAt:''})","return {sha:'',db:null,exportedAt:''}");
+ let restored=html.replace(publish,'').replaceAll('return publish(remoteCache)','return remoteCache').replace("return publish({sha:'',db:null,exportedAt:''})","return {sha:'',db:null,exportedAt:''}");
+ for(const name of ['addExpress','recover']){
+  const previous=fn(original,name),current=fn(restored,name);restored=restored.replace(current,previous);
+ }
+ restored=restored.replace(fn(original,'recover')+'\nasync function inspect',fn(original,'recover')+'async function inspect');
+ restored=restored.replace("collections=['items','packingHistory','outboundEvents','warehouseMaps','photoAttachments']","collections=['items','packingHistory','outboundEvents','warehouseMaps']").replace(",photoAttachments:'图片备注'",'').replace("targetType:'照片关联类型',targetId:'关联记录',bytes:'大图字节',thumbBytes:'缩略图字节',",'');
  assert.deepEqual(scripts(restored),scripts(original));
 });
 function fn(source,name){const start=source.indexOf('function '+name+'(');assert.ok(start>=0,name);let at=source.indexOf('{',start),n=1,i=at+1;for(;n;i++){if(source[i]==='{')n++;if(source[i]==='}')n--}return source.slice(start,i)}

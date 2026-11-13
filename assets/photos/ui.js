@@ -21,8 +21,15 @@
   const html=renderCard(item),target=targetForItem(item);
   let content=panel(target.type,target.id);
   if(item.pallet&&records('pallet',item.pallet).length)content+=panel('pallet',item.pallet,'托盘照片');
-  const end=html.lastIndexOf('</div>');
-  return html.slice(0,end)+content+html.slice(end);
+  const template=document.createElement('template');template.innerHTML=html;
+  const card=template.content.querySelector('.findResultCard');
+  if(!card)return html;
+  card.classList.add('find-photo-compact');
+  const photos=document.createElement('div');photos.className='find-photo-inline';photos.innerHTML=content;
+  const pallet=card.querySelector('.findResultPallet');card.insertBefore(photos,pallet);
+  const taken=card.querySelector('.findTakenBtn');if(taken&&pallet)pallet.append(taken);
+  for(const button of photos.querySelectorAll('[data-photo-open]'))button.textContent=button.closest('[data-photo-type="pallet"]')?'托盘图片':'图片';
+  return template.innerHTML;
  };
  const renderPallet=root.renderPalletItemsV51;
  root.renderPalletItemsV51=function(...args) {

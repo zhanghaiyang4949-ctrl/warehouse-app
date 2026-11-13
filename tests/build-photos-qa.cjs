@@ -28,6 +28,8 @@ const qa=`<script>
   check('保存失败保留照片草稿',document.querySelector('[data-photo-type=draft] .warehouse-photo-thumb')!==null);
   const retry=await addExpress();check('重新保存不重复关联',retry===true&&db.items.length===2&&db.photoAttachments.length===2);
   showPage('find');setFindModeW105('single');const host=document.createElement('div');host.innerHTML=renderFindCardV49(db.items[0]);document.getElementById('find').append(host);await wait(()=>host.querySelector('.warehouse-photo-thumb'));
+  const info=host.querySelector('.findResultLeft').getBoundingClientRect(),photos=host.querySelector('.find-photo-inline').getBoundingClientRect(),pallet=host.querySelector('.findResultPallet').getBoundingClientRect();
+  check('找货信息、图片、托盘并排且按钮移到托盘侧',photos.left>=info.right&&pallet.left>=photos.right&&photos.top<pallet.bottom&&pallet.top<photos.bottom&&host.querySelector('.findResultPallet .findTakenBtn'));
   const before=selectedFindIdsV64.size;host.querySelector('.warehouse-photo-thumb').click();await wait(()=>document.querySelector('.warehouse-photo-viewer img')?.src.startsWith('blob:'));
   check('缩略图点击大图且不误选货物',selectedFindIdsV64.size===before);document.querySelector('.warehouse-photo-viewer>button').click();
   document.getElementById('viewPallet').value=db.items[0].pallet;viewPallet();check('托盘照片入口',!!document.querySelector('#palletResult [data-photo-type=pallet]'));

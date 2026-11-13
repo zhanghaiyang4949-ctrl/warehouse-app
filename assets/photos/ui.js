@@ -86,8 +86,13 @@
     const row=document.createElement('div');row.className='warehouse-photo-edit-row';const button=thumbnailButton(record);
     button.onclick=()=>showLarge(record);const image=button.querySelector('img');git.imageURL(record).then(url=>{image.src=url;}).catch(error=>{image.alt=error.message;});
     const note=document.createElement('input');note.type='text';note.maxLength=500;note.placeholder='图片说明，例如无单号蓝色纸箱';note.value=record.note||'';note.oninput=()=>{record.note=note.value;};
-    row.append(button,note);list.append(row);
+    const details=document.createElement('div');details.className='warehouse-photo-edit-details';
+    const size=document.createElement('small');size.className='warehouse-photo-size';size.textContent='压缩后 '+store.formatBytes(record.bytes)+' · 缩略图 '+store.formatBytes(record.thumbBytes);
+    details.append(size,note);row.append(button,details);list.append(row);
    }
+   let summary=layer.querySelector('[data-size-summary]');
+   if(!summary){summary=document.createElement('p');summary.dataset.sizeSummary='';summary.className='warehouse-photo-size-summary';summary.setAttribute('role','status');list.after(summary);}
+   summary.textContent=state.selected.length?store.photoSizeSummary(state.selected)+'，确认同步后才会上传。':'';
   }
   async function choose(event){
    if(state.processing||state.saving)return;

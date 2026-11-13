@@ -15,7 +15,9 @@ const qa=`<script>
   const encoded=await WarehousePhotoStore.compress(file);const magic=new Uint8Array(await encoded.full.arrayBuffer());
   check('真实MozJPEG离线编码',magic[0]===255&&magic[1]===216,{full:encoded.full.size,thumbnail:encoded.thumbnail.size,width:encoded.width,height:encoded.height});
   const first=await WarehousePhotoStore.makeDraft(file,'draft','inbound');
-  await WarehousePhotos.open('draft','inbound');document.querySelector('.warehouse-photo-editor [data-save]').click();await wait(()=>!document.querySelector('.warehouse-photo-editor'));
+  await WarehousePhotos.open('draft','inbound');
+  check('确认前显示压缩大小和含缩略图合计',document.querySelector('.warehouse-photo-size').textContent.includes(WarehousePhotoStore.formatBytes(first.bytes))&&document.querySelector('[data-size-summary]').textContent.includes(WarehousePhotoStore.formatBytes(first.bytes+first.thumbBytes)));
+  document.querySelector('.warehouse-photo-editor [data-save]').click();await wait(()=>!document.querySelector('.warehouse-photo-editor'));
   document.querySelector('.photo-temporary-tracking input').click();check('无单号生成临时编号',document.getElementById('inExpress').value.startsWith('TEMP-'));
   document.getElementById('palletInput').value='A111';document.getElementById('inCustomer').value='QA';
   const success=await addExpress();check('照片随入库原子保存',success===true&&db.items.length===1&&db.photoAttachments.length===1&&db.photoAttachments[0].targetId===String(db.items[0].id));

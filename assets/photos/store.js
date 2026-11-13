@@ -11,7 +11,17 @@
   const ids = new Set(existing.map(row => row.id));
   return existing.concat(records.filter(row => !ids.has(row.id)));
  }
- if (typeof module !== 'undefined' && module.exports) { module.exports={scope,paths,mergeRecords};return; }
+ function formatBytes(bytes) {
+  if(!Number.isFinite(bytes)||bytes<0)return '大小未知';
+  if(bytes<1024)return bytes+' B';
+  return bytes<1048576?(bytes/1024).toFixed(1)+' KB':(bytes/1048576).toFixed(2)+' MB';
+ }
+ function photoSizeSummary(records) {
+  const known=records.every(row=>Number.isFinite(row.bytes)&&Number.isFinite(row.thumbBytes));
+  const total=records.reduce((sum,row)=>sum+(row.bytes||0)+(row.thumbBytes||0),0);
+  return '共 '+records.length+' 张 · '+(known?'图片合计 '+formatBytes(total)+'（含缩略图）':'部分图片大小未知');
+ }
+ if (typeof module !== 'undefined' && module.exports) { module.exports={scope,paths,mergeRecords,formatBytes,photoSizeSummary};return; }
  let opened;
  function database() {
   if (!opened) opened = new Promise((resolve,reject) => {
@@ -115,5 +125,5 @@
   const key=scope(getGitHubConfigV44());
   return transaction('readonly',store=>store.index('drafts').getAll([key,ownerKey(type,targetId),'draft']));
  }
- root.WarehousePhotoStore={scope,paths,mergeRecords,cache,digest,blobSha,prepareCodec,compress,cancelCompression,makeDraft,drafts,ownerKey};
+ root.WarehousePhotoStore={scope,paths,mergeRecords,formatBytes,photoSizeSummary,cache,digest,blobSha,prepareCodec,compress,cancelCompression,makeDraft,drafts,ownerKey};
 })(typeof window!=='undefined'?window:globalThis);

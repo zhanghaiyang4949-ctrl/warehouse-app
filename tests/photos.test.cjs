@@ -1,6 +1,16 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {merge,normalize}=require('./offline-current.cjs');
 const {paths,mergeRecords}=require('../assets/photos/store.js');
+const {formatBytes,photoSizeSummary}=require('../assets/photos/store.js');
+test('压缩大小按KB和MB显示，缺失数据不误报零',()=>{
+ assert.equal(formatBytes(153600),'150.0 KB');
+ assert.equal(formatBytes(1572864),'1.50 MB');
+ assert.equal(formatBytes(undefined),'大小未知');
+});
+test('选图合计包含每张压缩图及缩略图',()=>{
+ assert.equal(photoSizeSummary([{bytes:102400,thumbBytes:10240},{bytes:204800,thumbBytes:10240}]),'共 2 张 · 图片合计 320.0 KB（含缩略图）');
+ assert.match(photoSizeSummary([{}]),/部分图片大小未知/);
+});
 test('旧备份没有图片集合仍正常打开',()=>{const value=normalize({items:[]});assert.deepEqual(value.photoAttachments,[])});
 test('两台设备分别增加照片引用可同时保留',()=>{const base={items:[]},local={items:[],photoAttachments:[{id:'a',targetType:'item',targetId:'1'}]},remote={items:[],photoAttachments:[{id:'b',targetType:'pallet',targetId:'A'}]};const result=merge(base,local,remote);assert.equal(result.conflicts.length,0);assert.equal(result.db.photoAttachments.length,2)});
 test('同张照片备注两端冲突不能静默覆盖',()=>{const base={items:[],photoAttachments:[{id:'a',note:'original'}]},local=structuredClone(base),remote=structuredClone(base);local.photoAttachments[0].note='local';remote.photoAttachments[0].note='remote';assert.ok(merge(base,local,remote).conflicts.length)});

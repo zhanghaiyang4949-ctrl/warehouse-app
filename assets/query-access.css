@@ -1,0 +1,14 @@
+.query-access{margin-top:16px;padding-top:14px;border-top:1px solid #dce5ef;color:#29465b}
+.query-access h4{margin:0 0 10px;font-size:16px}
+.query-access label{display:block;font-size:13px;margin-top:10px}
+.query-access input{box-sizing:border-box;min-width:0;width:100%;font-size:16px}
+.query-access-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.query-access-actions button{width:auto;min-height:40px;padding:7px 12px;font-size:13px}
+.query-access-status{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.query-access-list article{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #e2e9f1}
+.query-access-list article>div:first-child{min-width:0;overflow-wrap:anywhere}
+.query-access-list small{display:block;color:#687e90;margin-top:4px;line-height:1.5}
+.query-access-list .query-access-actions{margin:0;flex-shrink:0}
+.query-access-log{font-size:13px;line-height:1.7;border-top:1px solid #e2e9f1;padding:8px 0;overflow-wrap:anywhere}
+.query-access-badge{display:none;position:fixed;right:18px;top:12px;z-index:11000;background:#245fc7;color:white;border:0;border-radius:8px;padding:10px 14px;box-shadow:0 2px 9px #0002;min-height:42px;font-size:14px}
+@media(max-width:650px){.query-access-list article{align-items:flex-start;flex-direction:column}.query-access-badge{top:auto;bottom:92px;right:12px}}

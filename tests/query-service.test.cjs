@@ -1,6 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {createService,hash}=require('../cloudfunctions/warehouseQueryV1/service');
 const crypto=require('node:crypto');
+const {gunzipSync}=require('node:zlib');
 function fixture(){
  let time=Date.now(),tables={devices:new Map(),rates:new Map(),audit:new Map()},serial=Promise.resolve();
  const adapter={get:async(t,id)=>structuredClone(tables[t].get(id)),put:async(t,id,v)=>tables[t].set(id,structuredClone(v))};
@@ -47,4 +48,18 @@ test('照片验证与图片下载共用一次请求预算，避免两个重试�
  d.source.load=async options=>{deadline=options?.deadline;assert.ok(Number.isFinite(deadline));return d.snapshot;};
  d.source.photo=async(photo,variant,options)=>{assert.equal(options?.deadline,deadline);return 'jpeg';};
  const result=await d.call('photo',{id:'photo1',variant:'thumbnail'},{token});assert.equal(result.content,'jpeg');
+});
+test('审核后的登录一次返回压缩查询数据，不包含密码校验值和GitHub路径',async()=>{
+ const d=fixture();const pending=await d.call('login');assert.equal(pending.snapshot,undefined);
+ await d.call('adminReview',{id:d.args.deviceId,status:'approved'});const login=await d.call('login');
+ assert.equal(login.snapshot.encoding,'gzip-base64');const decoded=JSON.parse(gunzipSync(Buffer.from(login.snapshot.content,'base64')));
+ assert.equal(decoded.items.length,1);assert.equal(decoded.items[0].express,'11111111');assert.equal(decoded.items[0].photos.length,1);
+ assert.ok(!JSON.stringify(decoded).includes('never-return'));assert.equal(decoded.passwordHash,undefined);
+});
+test('版本未变只返回轻量确认，新版才返回数据，撤销后仍拒绝版本检查',async()=>{
+ const d=fixture();await d.call('login');await d.call('adminReview',{id:d.args.deviceId,status:'approved'});const {token}=await d.call('login');
+ const same=await d.call('compactData',{revision:'r1'},{token});assert.equal(same.unchanged,true);assert.equal(same.content,undefined);
+ d.snapshot.revision='r2';d.snapshot.items[0].pallet='NEW';const changed=await d.call('compactData',{revision:'r1'},{token});
+ assert.equal(JSON.parse(gunzipSync(Buffer.from(changed.content,'base64'))).items[0].pallet,'NEW');
+ await d.call('adminReview',{id:d.args.deviceId,status:'revoked'});await assert.rejects(d.call('compactData',{revision:'r2'},{token}));
 });

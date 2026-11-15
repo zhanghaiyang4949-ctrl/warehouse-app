@@ -11,7 +11,7 @@ const data={passwordHash:hash('fixture-password'),revision:'fixture-v1',updatedA
  {id:3,express:'33330003',last4:'0003',customer:'QB',date:'2026-11-12',pallet:'B-1'}
 ],photoAttachments:[{id:'fixture-photo',targetType:'item',targetId:'1',note:'测试箱子'}]};
 let photo='',uploadedSnapshot;const service=createService({repo,source:{load:async()=>data,photo:async()=>photo,info:async()=>({owner:'fixture-owner',repo:'fixture-backup',branch:'main',path:'query-secure/query-data.json.gz'})},adminSecret:key});
-const transport=`<script>const realFetch=window.fetch.bind(window);window.fetch=(url,options)=>String(url).startsWith('https://query.fixture/')?realFetch('/api',options):String(url).startsWith('https://api.github.com/repos/fixture-owner/fixture-backup/contents/')?realFetch('/capture-query-upload',options):realFetch(url,options);</script>`;
+const transport=`<script>const realFetch=window.fetch.bind(window);window.__queryFixtureActions=[];window.fetch=(url,options)=>{if(String(url).startsWith('https://query.fixture/')){const action=JSON.parse(options.body).action;window.__queryFixtureActions.push(action);if(action==='compactData'&&window.__slowCompact){window.__compactStarted=true;return new Promise(resolve=>setTimeout(()=>realFetch('/api',options).then(result=>{window.__compactDone=true;resolve(result);}),1500));}return realFetch('/api',options);}return String(url).startsWith('https://api.github.com/repos/fixture-owner/fixture-backup/contents/')?realFetch('/capture-query-upload',options):realFetch(url,options);};</script>`;
 const clientTests=`<script>
 (async()=>{
  const tests=[],check=(name,ok)=>{tests.push({name,pass:!!ok});if(!ok)throw Error(name);},wait=async fn=>{for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('界面等待超时');};
@@ -22,14 +22,19 @@ const clientTests=`<script>
   const devices=await admin('adminList'),own=JSON.parse(localStorage.getItem('warehouseQueryDeviceV1')),device=devices.devices.find(x=>x.id===own.id);check('申请已生成',device?.status==='pending');
   await admin('adminReview',{id:device.id,status:'approved'});
   await wait(()=>payload?.items.length===3&&document.getElementById('app').style.display==='block');check('审核通过后等待页自动进入查询',true);
+  check('登录直接载入压缩快照，无串行分页请求',!window.__queryFixtureActions.includes('data')&&!window.__queryFixtureActions.includes('compactData'));
   document.getElementById('quick').value='QA';await quickSearch();check('快速查询保留原规则',currentItems.length===2);
   const filter=document.getElementById('palletFilter');check('快速查询生成筛选项',filter.options.length===3);filter.value='A-2';onBatchFilterChangeV81();check('快速筛选生效',document.querySelectorAll('#results .query-result').length===1);
   clearBatchFiltersV79();document.getElementById('sortField').value='pallet';document.getElementById('sortDirection').value='desc';renderCurrent();check('自然排序降序生效',document.querySelector('#results .query-result-pallet').textContent==='A-10');
-  clearBatchFiltersV79();document.getElementById('batch').value='0002\\n9999\\n0001';await batchSearch();check('批量查询保留原输入及未找到项',currentBatch.length===3&&document.getElementById('results').textContent.includes('9999')&&document.getElementById('results').textContent.indexOf('22220002')<document.getElementById('results').textContent.indexOf('11110001'));
+  clearBatchFiltersV79();document.getElementById('batch').value='0002\\n9999\\n0001';await batchSearch();check('批量查询保留原输入及未找到项',currentBatch.length===3&&document.getElementById('results').textContent.includes('9999')&&document.getElementById('results').textContent.indexOf('2222-0002')<document.getElementById('results').textContent.indexOf('1111-0001'));
+  check('数字单号格式仅影响显示，中文英文保持原样',document.getElementById('results').textContent.includes('1111-0001')&&payload.items[0].express==='11110001'&&WarehouseTrackingDisplay.format('车入suki261112')==='车入suki261112');
+  const before=payload;window.__slowCompact=true;await new Promise(r=>setTimeout(r,5100));
+  document.getElementById('quick').value='QA';const started=performance.now();await quickSearch();const elapsed=performance.now()-started;
+  check('后台请求延迟1.5秒时，本地搜索仍在100毫秒内完成',elapsed<100&&currentItems.length===2&&window.__compactStarted);await wait(()=>window.__compactDone);await new Promise(r=>setTimeout(r,30));check('版本未变化不重新下载或替换数据',payload===before);window.__slowCompact=false;
   const canvas=document.createElement('canvas');canvas.width=20;canvas.height=20;canvas.getContext('2d').fillRect(0,0,20,20);await fetch('/fixture-photo',{method:'POST',body:canvas.toDataURL('image/jpeg').split(',')[1]});
   document.querySelector('[data-query-view]').click();await wait(()=>document.querySelector('.query-photo-viewer img')?.naturalWidth>0);check('授权图片可放大',!!document.querySelector('.query-photo-viewer'));document.querySelector('.query-photo-viewer button').click();
   check('手机页面无横向溢出',document.documentElement.scrollWidth<=innerWidth);
-  await admin('adminReview',{id:device.id,status:'revoked'});await refreshLatestDataV75(false);check('撤销后立即清空界面和图片',payload===null&&document.getElementById('app').style.display==='none'&&!document.querySelector('.query-photo-viewer'));
+  await admin('adminReview',{id:device.id,status:'revoked'});await WarehouseQuery.checkAuthorization();check('撤销后权限核验清空界面和图片',payload===null&&document.getElementById('app').style.display==='none'&&!document.querySelector('.query-photo-viewer'));
   await admin('adminReview',{id:device.id,status:'approved'});document.getElementById('pwd').value='fixture-password';await login();document.getElementById('quick').value='QA';await quickSearch();document.querySelector('[data-query-view]').click();await wait(()=>document.querySelector('.query-photo-viewer img')?.naturalWidth>0);
   const connectedFetch=window.fetch;window.fetch=()=>Promise.reject(TypeError('fixture offline'));await WarehouseQuery.checkAuthorization();window.fetch=connectedFetch;
   check('断网无法核实权限时清空库存及已打开大图',payload===null&&!document.querySelector('.query-photo-viewer')&&document.getElementById('app').style.display==='none');
@@ -43,11 +48,14 @@ const managerTests=`<script>
  const tests=[],check=(name,ok)=>{tests.push({name,pass:!!ok});if(!ok)throw Error(name);},wait=async fn=>{for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('界面等待超时');};
  try{
   await wait(()=>storageReady&&document.querySelector('.query-access'));
+  check('管理端显示规则覆盖纯数字和中英文单号',formatTrackingDisplayW96('888877775555')==='8888-7777-5555'&&formatTrackingDisplayW96('车入suki261112')==='车入suki261112');
+  document.getElementById('inExpress').value='888877775555';updateInboundContext();check('待入库预览分组且输入原值不变',document.getElementById('ctxExpressW95').textContent==='8888-7777-5555'&&document.getElementById('inExpress').value==='888877775555');
+  document.getElementById('inExpress').value='车入suki261112';updateInboundContext();check('中英文待入库预览保持原样',document.getElementById('ctxExpressW95').textContent==='车入suki261112');
   const name='管理端验收人员',id=crypto.randomUUID(),secret='a'.repeat(64);
   await fetch('https://query.fixture/',{method:'POST',body:JSON.stringify({action:'login',args:{name,password:'fixture-password',deviceId:id,deviceSecret:secret}})});
   const box=document.querySelector('.query-access');box.querySelector('[data-endpoint]').value='https://query.fixture/';box.querySelector('[data-secret]').value=${JSON.stringify(key)};box.querySelector('[data-connect]').click();
   await wait(()=>box.querySelector('[data-id="'+id+'"]'));check('管理端收到人员申请提醒',document.querySelector('.query-access-badge').style.display==='block');
-  window.confirm=()=>true;box.querySelector('[data-id="'+id+'"][data-review="approved"]').click();await wait(()=>box.textContent.includes('已授权'));check('管理端审核按钮生效',box.querySelector('[data-id="'+id+'"][data-review="revoked"]'));
+  window.confirm=()=>true;box.querySelector('[data-id="'+id+'"][data-review="approved"]').click();await wait(()=>box.querySelector('[data-id="'+id+'"][data-review="revoked"]'));check('管理端审核按钮生效',true);
   showPage('data');setWorkspaceModeW106('data','query');check('审批位置在原查询管理页',!document.getElementById('data_queryW106').hidden);
   db.items=[{id:101,express:'QA0000101',customer:'QA',date:'2026-11-15',pallet:'T1'}];db.photoAttachments=[{id:'photo',targetType:'item',targetId:'101',github:{owner:'fixture-owner',repo:'fixture-backup',branch:'main',full:'warehouse-images/test.jpg',thumbnail:'warehouse-images/thumb.jpg',token:'must-not-leak'}}];
   localStorage.setItem('queryPasswordHashV72','fixture-hash');const snapshot=buildQueryPayloadV72();check('查询快照携带ID与图片但不泄露Token',snapshot.items[0].id==='101'&&snapshot.photoAttachments.length===1&&!JSON.stringify(snapshot).includes('must-not-leak'));

@@ -1,11 +1,31 @@
 'use strict';
 const crypto = require('node:crypto');
+const {gzipSync}=require('node:zlib');
 const hash = text => crypto.createHash('sha256').update(String(text)).digest('hex');
 const fail = (message, code='ACCESS_DENIED', status=403) => Object.assign(Error(message), {code,status});
 function equal(a,b) { return crypto.timingSafeEqual(Buffer.from(hash(a)),Buffer.from(hash(b))); }
 function createService({repo,source,adminSecret,now=Date.now}) {
  if(!adminSecret||adminSecret.length<32)throw Error('请配置至少32位的查询管理密钥');
  const sessionKey=crypto.createHmac('sha256',adminSecret).update('warehouse-query-session-v1').digest();
+ const compactCache=new Map();
+ function projectItem(x,photos){return {
+  id:String(x.id),express:String(x.express||''),last4:String(x.last4||String(x.express||'').slice(-4)),customer:String(x.customer||''),date:String(x.date||''),pallet:String(x.pallet||''),
+  photos:photos.filter(p=>p.targetType==='item'&&String(p.targetId)===String(x.id)||p.targetType==='pallet'&&String(p.targetId)===String(x.pallet)).map(p=>({id:p.id,note:String(p.note||''),type:p.targetType}))
+ };}
+ function compact(snapshot){
+  if(compactCache.has(snapshot.revision))return compactCache.get(snapshot.revision);
+  const items=[],photos=(snapshot.photoAttachments||[]).filter(p=>!p.deleted);let size=0;
+  const meta={revision:snapshot.revision,updatedAt:snapshot.updatedAt,features:snapshot.features||{}};
+  for(const item of snapshot.items){
+   if(item.deleted||item.status&&item.status!=='在库')continue;
+   const projected=projectItem(item,photos);size+=Buffer.byteLength(JSON.stringify(projected));
+   if(size>12*1024*1024)return {...meta,paged:true};items.push(projected);
+  }
+  const compressed=gzipSync(JSON.stringify({...meta,items}));
+  if(compressed.length>3*1024*1024)return {...meta,paged:true};
+  const result={...meta,total:items.length,encoding:'gzip-base64',content:compressed.toString('base64')};compactCache.set(snapshot.revision,result);
+  if(compactCache.size>3)compactCache.delete(compactCache.keys().next().value);return result;
+ }
  async function audit(tx,action,row,actor) {
   const at=new Date(now()).toISOString(),id=String(now()).padStart(13,'0')+'-'+crypto.randomUUID();
   await tx.put('audit',id,{id,at,action,actor,targetId:row.id,name:row.name,status:row.status});
@@ -81,7 +101,7 @@ function createService({repo,source,adminSecret,now=Date.now}) {
     }
     return next;
    });
-   return {status:row.status,name:row.name,...(row.status==='approved'?{token:sign(row),expiresAt:now()+8*3600000}:{})};
+   return {status:row.status,name:row.name,...(row.status==='approved'?{token:sign(row),expiresAt:now()+8*3600000,snapshot:compact(snapshot)}:{})};
   }
   if(action==='status') {
    const {id,proof}=credentials(args);await rate('poll:'+id,25);
@@ -90,16 +110,18 @@ function createService({repo,source,adminSecret,now=Date.now}) {
   }
   const row=await authorize(context.token);
   await rate('read:'+row.id,120);
+  if(action==='compactData'){
+   const snapshot=await source.load();
+   if(args.revision&&args.revision===snapshot.revision)return {unchanged:true,revision:snapshot.revision};
+   return compact(snapshot);
+  }
   if(action==='data') {
    const snapshot=await source.load({revision:args.revision}),offset=Number(args.offset||0);
    if(!Number.isSafeInteger(offset)||offset<0)throw fail('分页参数无效','BAD_REQUEST',400);
    if(args.revision&&args.revision!==snapshot.revision)throw fail('查询数据正在更新，请重试','REVISION_CHANGED',409);
    const active=snapshot.items.filter(x=>!x.deleted&&(!x.status||x.status==='在库'));
    const photos=(snapshot.photoAttachments||[]).filter(p=>!p.deleted);
-   const items=active.slice(offset,offset+300).map(x=>({
-    id:String(x.id),express:String(x.express||''),last4:String(x.last4||String(x.express||'').slice(-4)),customer:String(x.customer||''),date:String(x.date||''),pallet:String(x.pallet||''),
-    photos:photos.filter(p=>p.targetType==='item'&&String(p.targetId)===String(x.id)||p.targetType==='pallet'&&String(p.targetId)===String(x.pallet)).map(p=>({id:p.id,note:String(p.note||''),type:p.targetType}))
-   }));
+   const items=active.slice(offset,offset+300).map(x=>projectItem(x,photos));
    return {items,revision:snapshot.revision,updatedAt:snapshot.updatedAt,features:snapshot.features||{},nextOffset:offset+items.length<active.length?offset+items.length:null};
   }
   if(action==='photo') {

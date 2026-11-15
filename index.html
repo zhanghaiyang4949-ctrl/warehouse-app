@@ -4265,7 +4265,7 @@ function failInbound(message){
 // W96：单号仅在界面显示时，从右往左每 4 位用“-”分组；不修改数据库原值。
 function formatTrackingDisplayW96(value){
  const raw=String(value??"").trim();
- if(!raw)return "";
+ if(!/^[0-9]+$/.test(raw))return raw;
  const groups=[];
  for(let end=raw.length;end>0;end-=4){
    groups.unshift(raw.slice(Math.max(0,end-4),end));
@@ -5929,7 +5929,7 @@ function showFind(x){
  getFindElementW103("findResult").innerHTML=`
  <div class="result">
  客户：<b>${esc(x.customer||"-")}</b><br>
- 快递：${esc(x.express)}<br>
+ 快递：${esc(formatTrackingDisplayW96(x.express))}<br>
  日期：${esc(x.date)}<br>
  ${x.inboundNote?`入库备注：${esc(x.inboundNote)}<br>`:""}
  ${packingStatusHtmlV88(x.express)}
@@ -5989,7 +5989,7 @@ function softDeleteItem(id){
   if(x.status==="已出库"){toast("已出库记录不能删除");return;}
   deletingId=x.id;
   document.getElementById("deleteInfo").innerHTML=
-    "客户："+esc(x.customer||"-")+"<br>快递："+esc(x.express)+"<br>托盘："+esc(x.pallet);
+    "客户："+esc(x.customer||"-")+"<br>快递："+esc(formatTrackingDisplayW96(x.express))+"<br>托盘："+esc(x.pallet);
   document.getElementById("deleteModal").style.display="flex";
 }
 function closeDeleteModal(){
@@ -6386,7 +6386,7 @@ function confirmImportW93(plan){
  return new Promise(resolve=>{
   const layer=document.createElement('div');layer.className='modalMask';layer.style.display='flex';
   layer.innerHTML='<div class="modalBox" role="dialog" aria-modal="true" style="width:min(760px,100%);max-height:85vh;overflow:auto"><h3>确认导入与托盘变更</h3><p>'+esc(importSummaryW93(plan))+'</p><p>同一货物只更新托盘，空托盘保留原值。取消不会更改库存。</p>'+
-   '<div style="max-height:45vh;overflow:auto">'+(plan.changes.length?'<table><tr><th>行 / 单号</th><th>客户 / 日期</th><th>原托盘 → 新托盘</th></tr>'+plan.changes.map(x=>'<tr><td>'+x.row+' / '+esc(x.express)+'</td><td>'+esc(x.customer)+' / '+esc(x.date)+'</td><td>'+esc(x.from||'(空)')+' → '+esc(x.to)+'</td></tr>').join('')+'</table>':'<p>没有托盘变更。</p>')+
+   '<div style="max-height:45vh;overflow:auto">'+(plan.changes.length?'<table><tr><th>行 / 单号</th><th>客户 / 日期</th><th>原托盘 → 新托盘</th></tr>'+plan.changes.map(x=>'<tr><td>'+x.row+' / '+esc(formatTrackingDisplayW96(x.express))+'</td><td>'+esc(x.customer)+' / '+esc(x.date)+'</td><td>'+esc(x.from||'(空)')+' → '+esc(x.to)+'</td></tr>').join('')+'</table>':'<p>没有托盘变更。</p>')+
    (plan.details.length?'<details><summary>查看跳过 / 冲突 / 无效明细</summary>'+plan.details.map(x=>'<p>第 '+x.row+' 行：'+esc(x.reason)+'</p>').join('')+'</details>':'')+'</div><div class="modalBtns"><button class="gray" data-choice="cancel">取消</button><button class="primary" data-choice="confirm">确认导入</button></div></div>';
   const finish=value=>{layer.remove();resolve(value)};
   layer.querySelector('[data-choice="cancel"]').onclick=()=>finish(false);

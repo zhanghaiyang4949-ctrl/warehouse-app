@@ -4,10 +4,11 @@ const scripts=s=>[...s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].filte
 test('扫码与非图片业务脚本保留，图片入库和同步恢复的预期改动已隔离',()=>{
  const publish="function publish(value){window.dispatchEvent(new CustomEvent('warehouse-remote-backup',{detail:{key:k,sha:value.sha,exportedAt:value.exportedAt||''}}));return value}";
  let restored=html.replace(publish,'').replaceAll('return publish(remoteCache)','return remoteCache').replace("return publish({sha:'',db:null,exportedAt:''})","return {sha:'',db:null,exportedAt:''}");
- for(const name of ['addExpress','recover']){
+ for(const name of ['addExpress','recover','formatTrackingDisplayW96']){
   const previous=fn(original,name),current=fn(restored,name);restored=restored.replace(current,previous);
  }
  restored=restored.replace(fn(original,'recover')+'\nasync function inspect',fn(original,'recover')+'async function inspect');
+ restored=restored.replaceAll('esc(formatTrackingDisplayW96(x.express))','esc(x.express)');
  restored=restored.replace("collections=['items','packingHistory','outboundEvents','warehouseMaps','photoAttachments']","collections=['items','packingHistory','outboundEvents','warehouseMaps']").replace(",photoAttachments:'图片备注'",'').replace("targetType:'照片关联类型',targetId:'关联记录',bytes:'大图字节',thumbBytes:'缩略图字节',",'');
  assert.deepEqual(scripts(restored),scripts(original));
 });

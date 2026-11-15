@@ -77,7 +77,8 @@
   try{
    const current=await fetch(url+'?ref='+encodeURIComponent(source.branch),{headers,cache:'no-store',signal:controller.signal});let sha='';
    if(current.ok)sha=(await current.json()).sha;else if(current.status!==404)throw Error('私有查询快照读取失败：'+current.status);
-   const body={message:'Update private read-only query snapshot',branch:source.branch,content:utf8ToBase64V44(JSON.stringify(payload)),...(sha?{sha}:{})};
+   const content=source.path.endsWith('.gz')?root.WarehouseQuerySnapshot.encode(payload):utf8ToBase64V44(JSON.stringify(payload));
+   const body={message:'Update private read-only query snapshot',branch:source.branch,content,...(sha?{sha}:{})};
    const response=await fetch(url,{method:'PUT',headers,body:JSON.stringify(body),signal:controller.signal});
    if(!response.ok)throw Error([409,422].includes(response.status)?'查询快照已被其他设备更新，请重试同步':'私有查询同步失败：'+response.status);
    localStorage.setItem('queryLastSyncAtV73',new Date().toISOString());return payload.items.length;

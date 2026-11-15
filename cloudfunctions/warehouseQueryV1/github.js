@@ -1,5 +1,6 @@
 'use strict';
 const {hash}=require('./service');
+const {gunzipSync}=require('node:zlib');
 function createSource(env,fetcher=fetch,now=Date.now) {
  const owner=env.QUERY_GITHUB_OWNER,repo=env.QUERY_GITHUB_REPO,branch=env.QUERY_GITHUB_BRANCH||'main',path=env.QUERY_GITHUB_PATH||'query-secure/query-data.json';
  const token=env.QUERY_GITHUB_TOKEN;
@@ -8,10 +9,10 @@ function createSource(env,fetcher=fetch,now=Date.now) {
  let checkedAt=0,cached=null,cachedAt=0,loading,checking;
  const versions=new Map();
  function timeoutError(){return Object.assign(Error('GitHub连接暂时不稳定，读取已重试，请稍后重新登录或查询'),{status:503,code:'SOURCE_TIMEOUT',transient:true});}
- async function request(url,raw=false,max=20*1024*1024,deadline=Date.now()+18000) {
+ async function request(url,raw=false,max=20*1024*1024,deadline=Date.now()+18000,attemptMs=8000) {
   for(let attempt=0;attempt<2;attempt++){
    const remaining=deadline-Date.now();if(remaining<=0)throw timeoutError();
-   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(8000,remaining));
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(attemptMs,remaining));
    try {
     const r=await fetcher(url,{signal:controller.signal,headers:{Authorization:'Bearer '+token,Accept:raw?'application/vnd.github.raw+json':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','User-Agent':'warehouse-query-service'},redirect:'error'});
     if(!r.ok){await r.body?.cancel?.();throw Object.assign(Error(r.status===404?'查询数据或图片尚未同步，请联系管理员':'GitHub读取暂不可用，请稍后重试'),{status:503,code:'SOURCE_UNAVAILABLE',transient:r.status>=500});}
@@ -37,7 +38,10 @@ function createSource(env,fetcher=fetch,now=Date.now) {
   if(revision&&versions.has(revision))return versions.get(revision).snapshot;
   if(cached&&now()-cachedAt<5000)return cached;if(loading)return loading;
   loading=(async()=>{
-   const bytes=await request(fileUrl(path),true,20*1024*1024,deadline),data=JSON.parse(bytes.toString());
+   const bytes=await request(fileUrl(path),true,20*1024*1024,deadline);
+   let decoded=bytes;
+   if(bytes[0]===31&&bytes[1]===139){try{decoded=gunzipSync(bytes,{maxOutputLength:20*1024*1024});}catch{throw Object.assign(Error('压缩查询快照无效，请在管理端重新同步'),{status:503,code:'SOURCE_FORMAT_INVALID'});}}
+   const data=JSON.parse(decoded.toString());
    if(data.version!==3||!Array.isArray(data.items)||data.items.some(x=>x.id===undefined||x.id===null)||!/^[a-f0-9]{64}$/.test(data.passwordHash||'')||!Array.isArray(data.photoAttachments||[]))throw Error('查询快照格式无效，请在管理端重新同步');
    cached={...data,revision:hash(bytes)};cachedAt=now();versions.set(cached.revision,{snapshot:cached,expiresAt:now()+120000});
    if(versions.size>3)versions.delete(versions.keys().next().value);return cached;
@@ -46,7 +50,7 @@ function createSource(env,fetcher=fetch,now=Date.now) {
  async function photo(record,variant,{deadline=Date.now()+18000}={}) {
   await privateRepo(deadline);const github=record.github,p=github?.[variant];
   if(!github||github.owner!==owner||github.repo!==repo||github.branch!==branch||!/^warehouse-images\/[0-9]{4}\/[0-9]{2}\/[0-9]{2}\/[a-f0-9]{2}\/[a-f0-9]{64}(?:-thumb)?\.jpg$/.test(p||''))throw Object.assign(Error('图片来源与私有仓库不一致'),{code:'PHOTO_SOURCE_INVALID',status:403});
-  const bytes=await request(fileUrl(p),true,4*1024*1024,deadline);
+  const bytes=await request(fileUrl(p),true,4*1024*1024,deadline,14000);
   if(bytes[0]!==255||bytes[1]!==216)throw Error('图片不是有效JPEG文件');return bytes.toString('base64');
  }
  return {load,photo,info:async()=>{await privateRepo();return {owner,repo,branch,path};}};

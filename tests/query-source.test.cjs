@@ -1,5 +1,8 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {createSource}=require('../cloudfunctions/warehouseQueryV1/github');
+const {gzipSync,gunzipSync}=require('node:zlib');
+const {encode}=require('../assets/query-snapshot');
+const {gzip}=require('../assets/vendor/pako_deflate-2.1.0.min');
 const env={QUERY_GITHUB_OWNER:'qa',QUERY_GITHUB_REPO:'private-backup',QUERY_GITHUB_TOKEN:'fixture-secret'};
 function response(value,status=200){return new Response(typeof value==='string'||Buffer.isBuffer(value)?value:JSON.stringify(value),{status});}
 test('公开仓库拒绝服务，不从公共快照回退读取',async()=>{
@@ -54,4 +57,20 @@ test('已通过审核的完整登录流程遇到GitHub短暂超时仍返回登�
  const service=createService({repo:{...adapter,transaction:fn=>fn(adapter)},source,adminSecret:'a'.repeat(64)});
  const result=await service.dispatch('login',{deviceId:id,deviceSecret:secret,name:'连接回归测试',password:'fixture-password'},{ip:'fixture'});
  assert.equal(result.status,'approved');assert.ok(result.token);assert.equal(reads,2);assert.ok(tables.devices.get(id).lastLoginAt);
+});
+test('管理端实际压缩组件生成可无损还原的中文查询快照',()=>{
+ const payload={version:3,items:[{id:'one',express:'00001234',customer:'中文客户',pallet:'A-1'}],photoAttachments:[{note:'蓝色箱子'}]};
+ const bytes=Buffer.from(encode(payload,gzip),'base64');assert.equal(bytes[0],31);assert.equal(bytes[1],139);assert.deepEqual(JSON.parse(gunzipSync(bytes)),payload);
+});
+test('压缩查询快照直接从私有GitHub读取并解压，查询内容保持一致',async()=>{
+ const payload={version:3,items:[{id:'one',express:'00001234',customer:'中文客户'}],passwordHash:'a'.repeat(64)};
+ const compressed=gzipSync(JSON.stringify(payload));
+ const source=createSource({...env,QUERY_GITHUB_PATH:'query-secure/query-data.json.gz'},async url=>response(url.includes('/contents/')?compressed:{private:true}));
+ const result=await source.load();assert.deepEqual(result.items,payload.items);assert.equal(result.passwordHash,payload.passwordHash);
+});
+test('损坏或解压后超限的快照拒绝读取，不回退为公开数据',async()=>{
+ for(const compressed of [Buffer.from([31,139,0,0]),gzipSync('x'.repeat(21*1024*1024))]){
+  const source=createSource(env,async url=>response(url.includes('/contents/')?compressed:{private:true}));
+  await assert.rejects(source.load(),error=>error.code==='SOURCE_FORMAT_INVALID');
+ }
 });

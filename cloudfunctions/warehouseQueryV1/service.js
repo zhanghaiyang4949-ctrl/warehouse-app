@@ -91,7 +91,7 @@ function createService({repo,source,adminSecret,now=Date.now}) {
   const row=await authorize(context.token);
   await rate('read:'+row.id,120);
   if(action==='data') {
-   const snapshot=await source.load(),offset=Number(args.offset||0);
+   const snapshot=await source.load({revision:args.revision}),offset=Number(args.offset||0);
    if(!Number.isSafeInteger(offset)||offset<0)throw fail('分页参数无效','BAD_REQUEST',400);
    if(args.revision&&args.revision!==snapshot.revision)throw fail('查询数据正在更新，请重试','REVISION_CHANGED',409);
    const active=snapshot.items.filter(x=>!x.deleted&&(!x.status||x.status==='在库'));
@@ -104,11 +104,11 @@ function createService({repo,source,adminSecret,now=Date.now}) {
   }
   if(action==='photo') {
    if(!['full','thumbnail'].includes(args.variant))throw fail('图片类型无效','BAD_REQUEST',400);
-   const snapshot=await source.load();
+   const deadline=Date.now()+18000,snapshot=await source.load({deadline});
    const photo=(snapshot.photoAttachments||[]).find(p=>p.id===args.id&&!p.deleted);
    const visible=photo&&snapshot.items.some(x=>!x.deleted&&(!x.status||x.status==='在库')&&(photo.targetType==='item'&&String(photo.targetId)===String(x.id)||photo.targetType==='pallet'&&String(photo.targetId)===String(x.pallet)));
    if(!visible)throw fail('图片不可用','NOT_FOUND',404);
-   return {content:await source.photo(photo,args.variant),mime:'image/jpeg'};
+   return {content:await source.photo(photo,args.variant,{deadline}),mime:'image/jpeg'};
   }
   throw fail('未知查询操作','BAD_REQUEST',400);
  }

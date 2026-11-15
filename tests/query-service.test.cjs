@@ -12,7 +12,7 @@ function fixture(){
  const key='a'.repeat(64),ctx={ip:'test',adminKey:key};
  const args={deviceId:crypto.randomUUID(),deviceSecret:crypto.randomBytes(32).toString('hex'),name:'张三',password:'test-password'};
  const service=createService({repo,source,adminSecret:key,now:()=>time});
- return {call:(action,a=args,c=ctx)=>service.dispatch(action,a,c),args,ctx,snapshot,table:t=>tables[t],advance:()=>time+=61000};
+ return {call:(action,a=args,c=ctx)=>service.dispatch(action,a,c),args,ctx,snapshot,source,table:t=>tables[t],advance:()=>time+=61000};
 }
 test('首次申请不泄露库存，重复申请幂等，审核后才能读取',async()=>{
  const d=fixture();assert.equal((await d.call('login')).status,'pending');assert.equal((await d.call('login')).status,'pending');assert.equal(d.table('devices').size,1);
@@ -41,4 +41,10 @@ test('密码尝试限流，申请和审核日志不含密码凭据',async()=>{
 test('数据分页校验版本，不接受任意图片变体',async()=>{
  const d=fixture();await d.call('login');await d.call('adminReview',{id:d.args.deviceId,status:'approved'});const {token}=await d.call('login');
  await assert.rejects(d.call('data',{revision:'old'},{token}),e=>e.code==='REVISION_CHANGED');await assert.rejects(d.call('photo',{id:'photo1',variant:'../../secret'},{token}));
+});
+test('照片验证与图片下载共用一次请求预算，避免两个重试周期叠加',async()=>{
+ const d=fixture();await d.call('login');await d.call('adminReview',{id:d.args.deviceId,status:'approved'});const {token}=await d.call('login');let deadline;
+ d.source.load=async options=>{deadline=options?.deadline;assert.ok(Number.isFinite(deadline));return d.snapshot;};
+ d.source.photo=async(photo,variant,options)=>{assert.equal(options?.deadline,deadline);return 'jpeg';};
+ const result=await d.call('photo',{id:'photo1',variant:'thumbnail'},{token});assert.equal(result.content,'jpeg');
 });

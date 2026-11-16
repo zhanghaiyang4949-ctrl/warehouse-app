@@ -20,7 +20,8 @@
   function createController(options) {
     const doc = options.document, win = options.window;
     const threshold = options.threshold || 240;
-    let gesture = null, destroyed = false;
+    const holdMs=options.holdMs??2000,now=options.now||Date.now;
+    let gesture = null, destroyed = false,holdTimer=null;
     const atTop = () => (doc.scrollingElement || doc.documentElement).scrollTop <= 0 && !(win.scrollY > 0);
     function excluded(target) {
       if (!target || target.closest?.(BLOCKED)) return true;
@@ -30,13 +31,13 @@
       }
       return false;
     }
-    const paint = distance => options.onProgress?.(distance, threshold);
-    function cancel() { gesture = null; paint(0); }
+    const paint = distance => options.onProgress?.(distance, threshold,gesture?.reachedAt!=null?Math.max(0,holdMs-(now()-gesture.reachedAt)):holdMs);
+    function cancel() { if(holdTimer)clearTimeout(holdTimer);holdTimer=null;gesture = null; paint(0); }
     function start(event) {
       cancel();
       if (destroyed || event.touches.length !== 1 || !atTop() || excluded(event.target) || options.canStart?.(event) === false) return;
       const touch = event.touches[0];
-      gesture = { x: touch.clientX, y: touch.clientY, id: touch.identifier, distance: 0, active: false };
+      gesture = { x: touch.clientX, y: touch.clientY, id: touch.identifier, distance: 0, active: false, reachedAt: null };
     }
     function move(event) {
       if (!gesture) return;
@@ -53,12 +54,13 @@
       if (!event.cancelable) return cancel();
       event.preventDefault();
       gesture.distance = Math.max(0, dy);
+      if(gesture.distance>=threshold){if(gesture.reachedAt===null){gesture.reachedAt=now();const own=gesture;holdTimer=setTimeout(()=>{if(gesture===own&&atTop()&&options.canStart?.({target:doc.body})!==false)paint(gesture.distance);},holdMs);}}else{gesture.reachedAt=null;if(holdTimer)clearTimeout(holdTimer);holdTimer=null;}
       paint(gesture.distance);
     }
     function end(event) {
       if (!gesture) return;
       if (event.touches?.length) return cancel();
-      const refresh = gesture.active && gesture.distance >= threshold && atTop() && options.canStart?.(event) !== false;
+      const refresh = gesture.active && gesture.distance >= threshold && gesture.reachedAt!==null && now()-gesture.reachedAt>=holdMs && atTop() && options.canStart?.(event) !== false;
       cancel();
       if (refresh) options.onRefresh();
     }
@@ -89,12 +91,12 @@
     let ready=false,notified=false;
     const controller = createController({ ...options,
       canStart: event => !visibleDialog() && options.canStart?.(event) !== false,
-      onProgress(distance, threshold) {
+      onProgress(distance, threshold, remaining) {
         indicator.hidden = distance <= 0;
         const reached=distance>=threshold;indicator.className='warehouse-pull-refresh'+(reached?' is-ready':'');
         if(reached&&!ready&&!notified){notified=true;try{win.navigator?.vibrate?.(12);}catch{}}
         ready=reached;if(distance<=0)notified=false;
-        const text = distance >= threshold ? '松开刷新' : '继续下拉刷新';
+        const text = distance >= threshold ? (remaining>0?'保持 2 秒后松开刷新':'松开刷新') : '继续下拉刷新';
         if (indicator.textContent !== text) indicator.textContent = text;
         options.onProgress?.(distance, threshold);
       },

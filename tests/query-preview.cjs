@@ -9,7 +9,7 @@ const data={passwordHash:hash('fixture-password'),revision:'fixture-v1',updatedA
  {id:1,express:'11110001',last4:'0001',customer:'QA',date:'2026-11-10',pallet:'A-2'},
  {id:2,express:'22220002',last4:'0002',customer:'QA',date:'2026-11-11',pallet:'A-10'},
  {id:3,express:'33330003',last4:'0003',customer:'QB',date:'2026-11-12',pallet:'B-1'}
-],photoAttachments:[{id:'fixture-photo',targetType:'item',targetId:'1',note:'测试箱子'}]};
+],photoAttachments:[{id:'fixture-photo',targetType:'item',targetId:'1',note:'测试箱子'},{id:'fixture-photo-2',targetType:'item',targetId:'1',note:'第二张'},{id:'fixture-photo-3',targetType:'item',targetId:'1',note:'第三张'}]};
 let photo='',uploadedSnapshot;const service=createService({repo,source:{load:async()=>data,photo:async()=>photo,info:async()=>({owner:'fixture-owner',repo:'fixture-backup',branch:'main',path:'query-secure/query-data.json.gz'})},adminSecret:key});
 const transport=`<script>const realFetch=window.fetch.bind(window);window.__queryFixtureActions=[];window.fetch=(url,options)=>{if(String(url).startsWith('https://query.fixture/')){const action=JSON.parse(options.body).action;window.__queryFixtureActions.push(action);if(action==='compactData'&&window.__slowCompact){window.__compactStarted=true;return new Promise(resolve=>setTimeout(()=>realFetch('/api',options).then(result=>{window.__compactDone=true;resolve(result);}),1500));}return realFetch('/api',options);}return String(url).startsWith('https://api.github.com/repos/fixture-owner/fixture-backup/contents/')?realFetch('/capture-query-upload',options):realFetch(url,options);};</script>`;
 const clientTests=`<script>
@@ -23,7 +23,8 @@ const clientTests=`<script>
   await admin('adminReview',{id:device.id,status:'approved'});
   await wait(()=>payload?.items.length===3&&document.getElementById('app').style.display==='block');check('审核通过后等待页自动进入查询',true);
   check('登录直接载入压缩快照，无串行分页请求',!window.__queryFixtureActions.includes('data')&&!window.__queryFixtureActions.includes('compactData'));
-  document.getElementById('quick').value='QA';await quickSearch();check('快速查询保留原规则',currentItems.length===2);
+  document.getElementById('quick').value='0001';await quickSearch();check('默认尾号4位查询生效',currentItems.length===1&&currentItems[0].id==='1');
+  const tailSwitch=document.getElementById('queryTailEnabled');tailSwitch.checked=false;tailSwitch.dispatchEvent(new Event('change'));document.getElementById('quick').value='QA';await quickSearch();check('快速查询保留原规则',currentItems.length===2);
   const filter=document.getElementById('palletFilter');check('快速查询生成筛选项',filter.options.length===3);filter.value='A-2';onBatchFilterChangeV81();check('快速筛选生效',document.querySelectorAll('#results .query-result').length===1);
   clearBatchFiltersV79();document.getElementById('sortField').value='pallet';document.getElementById('sortDirection').value='desc';renderCurrent();check('自然排序降序生效',document.querySelector('#results .query-result-pallet').textContent==='A-10');
   clearBatchFiltersV79();document.getElementById('batch').value='0002\\n9999\\n0001';await batchSearch();check('批量查询保留原输入及未找到项',currentBatch.length===3&&document.getElementById('results').textContent.includes('9999')&&document.getElementById('results').textContent.indexOf('2222-0002')<document.getElementById('results').textContent.indexOf('1111-0001'));
@@ -32,7 +33,8 @@ const clientTests=`<script>
   document.getElementById('quick').value='QA';const started=performance.now();await quickSearch();const elapsed=performance.now()-started;
   check('后台请求延迟1.5秒时，本地搜索仍在100毫秒内完成',elapsed<100&&currentItems.length===2&&window.__compactStarted);await wait(()=>window.__compactDone);await new Promise(r=>setTimeout(r,30));check('版本未变化不重新下载或替换数据',payload===before);window.__slowCompact=false;
   const canvas=document.createElement('canvas');canvas.width=20;canvas.height=20;canvas.getContext('2d').fillRect(0,0,20,20);await fetch('/fixture-photo',{method:'POST',body:canvas.toDataURL('image/jpeg').split(',')[1]});
-  document.querySelector('[data-query-view]').click();await wait(()=>document.querySelector('.query-photo-viewer img')?.naturalWidth>0);check('授权图片可放大',!!document.querySelector('.query-photo-viewer'));document.querySelector('.query-photo-viewer button').click();
+  document.querySelector('[data-query-view]').click();await wait(()=>document.querySelector('.query-photo-viewer img')?.naturalWidth>0);check('授权图片可放大',!!document.querySelector('.query-photo-viewer'));check('查询三张图片全部可见',document.querySelectorAll('.query-result-photos button').length===3);document.querySelector('.warehouse-photo-gallery-next').click();await wait(()=>document.querySelector('.warehouse-photo-gallery-counter').textContent==='2 / 3');check('大图下一张保留对应货物范围',document.querySelector('.warehouse-photo-gallery-counter').textContent==='2 / 3');document.querySelector('.query-photo-viewer button').click();
+  const collision={id:'extra',express:'99990001',last4:'0001',customer:'QA',date:'2026-11-10',pallet:'A-2'};payload.items.push(collision);document.getElementById('quick').value='0001';await quickSearch();check('同托盘重尾号着色并标记',document.querySelectorAll('.query-result.tail-collision').length===2&&document.querySelector('.tail-collision-badge').textContent.includes('2 件'));payload.items.pop();document.getElementById('quick').value='QA';await quickSearch();
   check('手机页面无横向溢出',document.documentElement.scrollWidth<=innerWidth);
   await admin('adminReview',{id:device.id,status:'revoked'});await WarehouseQuery.checkAuthorization();check('撤销后权限核验清空界面和图片',payload===null&&document.getElementById('app').style.display==='none'&&!document.querySelector('.query-photo-viewer'));
   await admin('adminReview',{id:device.id,status:'approved'});document.getElementById('pwd').value='fixture-password';await login();document.getElementById('quick').value='QA';await quickSearch();document.querySelector('[data-query-view]').click();await wait(()=>document.querySelector('.query-photo-viewer img')?.naturalWidth>0);
@@ -63,6 +65,12 @@ const managerTests=`<script>
   await putQueryDataToGitHubV73();const uploaded=await(await fetch('/captured-query-status')).json();check('管理端同步上传有效压缩快照且内容保持一致',uploaded.gzip&&uploaded.id==='101'&&uploaded.photos===1);
   box.querySelector('[data-logs]').click();await wait(()=>box.querySelector('[data-log-list]').textContent.includes('通过授权'));check('登录审核日志可查看',true);
   check('管理手机版无横向溢出',document.documentElement.scrollWidth<=innerWidth);
+  db.items=[{id:201,express:'11111234',pallet:'A-1',customer:'QA'},{id:202,express:'22221234',pallet:'A-1',customer:'QA'}];db.photoAttachments=[1,2,3].map(n=>({id:'manager-photo-'+n,targetType:'item',targetId:'201',note:'照片 '+n}));
+  const photoCanvas=document.createElement('canvas');photoCanvas.width=20;photoCanvas.height=20;WarehousePhotoGit.imageURL=async()=>photoCanvas.toDataURL('image/jpeg');
+  findResultStateV49={type:'single',singleItems:db.items,batchGroups:[]};buildFindResultFiltersV49(false);renderStoredFindResultsV49();showPage('find');WarehousePhotos.refresh();
+  check('管理端同托盘重尾号两条着色',document.querySelectorAll('.findResultCard.tail-collision').length===2);
+  const picture=document.querySelector('[data-photo-view="manager-photo-1"]');check('管理端同一货物保留三张缩略图',document.querySelectorAll('[data-photo-view]').length===3);picture.click();await wait(()=>document.querySelector('.warehouse-photo-viewer img')?.naturalWidth>0);document.querySelector('.warehouse-photo-gallery-next').click();check('管理端大图可切到第二张',document.querySelector('.warehouse-photo-gallery-counter').textContent==='2 / 3');document.querySelector('.warehouse-photo-gallery-close').click();
+  check('管理端自定义下拉已安装',document.documentElement.classList.contains('warehouse-pull-refresh-enabled'));check('找货含照片布局无横向溢出',document.documentElement.scrollWidth<=innerWidth);
  }catch(error){tests.push({error:error.message,stack:error.stack});}
  const out=document.createElement('pre');out.id='query-qa-result';out.textContent=JSON.stringify(tests);document.body.append(out);
 })();</script>`;

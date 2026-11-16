@@ -42,8 +42,8 @@
   if(busyImages.has(image)||!image.isConnected)return;busyImages.add(image);
   const record=(db.photoAttachments||[]).find(row=>row.id===image.dataset.photoId)||inbound.find(row=>row.id===image.dataset.photoId);
   if(!record)return;
-  try {image.src=await git.imageURL(record);image.alt=record.note||'照片，点击放大';}
-  catch(error){image.alt='照片暂不可用';image.title=error.message;}
+  try {const url=await git.imageURL(record);if(image.isConnected){image.src=url;image.alt=record.note||'照片，点击放大';}}
+  catch(error){if(image.isConnected){image.alt='照片暂不可用';image.title=error.message;}}
  }
  const intersection='IntersectionObserver' in window?new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){intersection.unobserve(entry.target);loadThumbnail(entry.target);}}):null;
  function thumbnailButton(record) {
@@ -59,18 +59,16 @@
    if(box.dataset.signature===signature)continue;
    box.dataset.signature=signature;box.replaceChildren();
    for(const record of images){const button=thumbnailButton(record);box.append(button);const image=button.querySelector('img');intersection?intersection.observe(image):loadThumbnail(image);}
+   let hint=host.querySelector('.warehouse-photo-count');
+   if(!hint){hint=document.createElement('small');hint.className='warehouse-photo-count';box.after(hint);}
+   hint.textContent=images.length?'共 '+images.length+' 张 · 点击放大'+(images.length>1?' · 左右滑动查看':''):'';
    if(!images.length){const text=document.createElement('small');text.className='muted';text.textContent=type==='draft'?'照片压缩后随本次入库保存':'可补拍箱子或托盘照片';box.append(text);}
   }
   const count=document.querySelector('[data-photo-total]');
   if(count){const all=(db.photoAttachments||[]).filter(row=>!row.deleted),bytes=all.reduce((sum,row)=>sum+(row.bytes||0)+(row.thumbBytes||0),0);const text='已关联 '+all.length+' 张照片，图片合计约 '+(bytes/1e6).toFixed(1)+' MB（Git历史占用另计）';if(count.textContent!==text)count.textContent=text;}
  }
- async function showLarge(record) {
-  const layer=document.createElement('div');layer.className='warehouse-photo-viewer';layer.setAttribute('role','dialog');layer.setAttribute('aria-modal','true');layer.setAttribute('aria-label','照片大图');
-  const close=document.createElement('button');close.type='button';close.textContent='关闭';const image=document.createElement('img');image.alt=record.note||'照片大图';const status=document.createElement('p');status.textContent='正在加载大图…';
-  layer.append(close,image,status);const previous=document.body.style.overflow;document.body.style.overflow='hidden';document.body.append(layer);
-  close.onclick=()=>{layer.remove();document.body.style.overflow=previous;};
-  try {image.src=await git.imageURL(record,'full');status.textContent=record.note||'双指缩放查看细节';}
-  catch(error){status.textContent=error.message;}
+ function showLarge(record,images=[record]) {
+  return root.WarehousePhotoGallery.open({records:images,index:Math.max(0,images.findIndex(row=>row.id===record.id)),extraClass:'warehouse-photo-viewer',loadImage:row=>git.imageURL(row,'full')});
  }
  async function markSaved(rows) {
   for(const record of rows){const cached=await store.cache.get(record.id);if(cached){cached.record=record;cached.draft=false;cached.stage='saved';await store.cache.put(cached);}}
@@ -91,7 +89,7 @@
    const list=layer.querySelector('[data-list]');list.replaceChildren();
    for(const record of state.selected){
     const row=document.createElement('div');row.className='warehouse-photo-edit-row';const button=thumbnailButton(record);
-    button.onclick=()=>showLarge(record);const image=button.querySelector('img');git.imageURL(record).then(url=>{image.src=url;}).catch(error=>{image.alt=error.message;});
+    button.onclick=()=>showLarge(record,state.selected);const image=button.querySelector('img');git.imageURL(record).then(url=>{if(image.isConnected)image.src=url;}).catch(error=>{if(image.isConnected)image.alt=error.message;});
     const note=document.createElement('input');note.type='text';note.maxLength=500;note.placeholder='图片说明，例如无单号蓝色纸箱';note.value=record.note||'';note.oninput=()=>{record.note=note.value;};
     const details=document.createElement('div');details.className='warehouse-photo-edit-details';
     const size=document.createElement('small');size.className='warehouse-photo-size';size.textContent='压缩后 '+store.formatBytes(record.bytes)+' · 缩略图 '+store.formatBytes(record.thumbBytes);
@@ -140,7 +138,7 @@
  document.addEventListener('click',event=>{
   const button=event.target.closest('[data-photo-open],[data-photo-view]');if(!button||button.closest('.warehouse-photo-editor'))return;
   event.preventDefault();event.stopPropagation();
-  if(button.dataset.photoView){const record=(db.photoAttachments||[]).find(x=>x.id===button.dataset.photoView)||inbound.find(x=>x.id===button.dataset.photoView);if(record)showLarge(record);return;}
+  if(button.dataset.photoView){const panel=button.closest('.warehouse-photo-panel'),images=panel?(panel.dataset.photoType==='draft'?inbound:records(panel.dataset.photoType,decodeURIComponent(panel.dataset.photoOwner))):[];const record=images.find(x=>x.id===button.dataset.photoView);if(record)showLarge(record,images);return;}
   const panel=button.closest('.warehouse-photo-panel');open(panel.dataset.photoType,decodeURIComponent(panel.dataset.photoOwner)).catch(error=>toast(error.message));
  },true);
  const guard=root.warehouseGitHubGuard20261023,originalConfirm=guard.confirm.bind(guard);

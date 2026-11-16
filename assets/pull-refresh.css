@@ -1,0 +1,19 @@
+/* Scope root overscroll suppression to the manager after JS installation. */
+html.warehouse-pull-refresh-enabled,
+html.warehouse-pull-refresh-enabled body { overscroll-behavior-y: none; }
+.warehouse-pull-refresh {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9998;
+  padding: 10px 18px;
+  border: 1px solid #d5e1ef;
+  border-radius: 24px;
+  background: #fff;
+  color: #183551;
+  box-shadow: 0 4px 18px #18355124;
+  font-size: 14px;
+  pointer-events: none;
+}
+.warehouse-pull-refresh[hidden] { display: none; }

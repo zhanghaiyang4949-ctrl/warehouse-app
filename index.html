@@ -2141,7 +2141,10 @@ input[type="checkbox"],input[type="radio"]{flex-shrink:0}
 <link rel="stylesheet" href="assets/data-layout.css?v=20261102-safari-frame">
 <link rel="stylesheet" href="assets/packing-sync-ui.css?v=20261102">
 <link rel="stylesheet" href="assets/inbound-controls.css">
-<link rel="stylesheet" href="assets/photos/photos.css?v=20261114-compact">
+<link rel="stylesheet" href="assets/photos/photos.css?v=20261117-gallery">
+<link rel="stylesheet" href="assets/tail-collisions.css?v=20261117">
+<link rel="stylesheet" href="assets/photo-gallery.css?v=20261117">
+<link rel="stylesheet" href="assets/pull-refresh.css?v=20261117">
 </head>
 <body>
 <div class="wrap">
@@ -5155,6 +5158,10 @@ async function addExpress(){
  );
  if(old){showInboundFailureFeedback("重复：已在 "+(old.pallet||"未记录托盘")+" ｜ "+(old.customer||"未填写客户")+" ｜ "+(old.date||"未填写日期"));toast("相同单号、客户和日期已在库");return false;}
 
+ const collisionTail=normalizeStoredTrackingW100(v).slice(-4);
+ const sameTail=collisionTail.length===4?db.items.filter(x=>!x.deleted&&(x.status==='在库'||!x.status)&&String(x.pallet||'').trim().toUpperCase()===String(p).trim().toUpperCase()&&normalizeStoredTrackingW100(x.express).slice(-4)===collisionTail):[];
+ if(sameTail.length&&!confirm('当前托盘 '+p+' 已有 '+sameTail.length+' 件尾号 '+collisionTail+' 的货物：\n'+sameTail.slice(0,8).map(x=>formatTrackingDisplayW96(x.express)).join('\n')+'\n请核对完整单号，是否继续上架？'))return false;
+
  const inNowV86=new Date();
  const item={
    id:Date.now(),
@@ -7874,7 +7881,11 @@ window.warehouseGitHubGuard20261023=guard;async function report(fn){try{return a
 <script src="assets/inbound-controls.js"></script>
 <script src="assets/photos/store.js?v=20261114"></script>
 <script src="assets/photos/github.js?v=20261112"></script>
-<script src="assets/photos/ui.js?v=20261114-compact"></script>
+<script src="assets/photo-gallery.js?v=20261117"></script>
+<script src="assets/photos/ui.js?v=20261117-gallery"></script>
+<script src="assets/tail-collisions.js?v=20261117"></script>
+<script src="assets/collision-ui.js?v=20261117"></script>
+<script src="assets/pull-refresh.js?v=20261117"></script>
 <script src="assets/sync-recovery.js?v=20261112"></script>
 <link rel="stylesheet" href="assets/query-access.css?v=20261115">
 <script src="assets/vendor/pako_deflate-2.1.0.min.js"></script>

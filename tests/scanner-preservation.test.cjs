@@ -4,6 +4,7 @@ const scripts=s=>[...s.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].filte
 test('扫码与非图片业务脚本保留，图片入库和同步恢复的预期改动已隔离',()=>{
  const publish="function publish(value){window.dispatchEvent(new CustomEvent('warehouse-remote-backup',{detail:{key:k,sha:value.sha,exportedAt:value.exportedAt||''}}));return value}";
  let restored=html.replace(publish,'').replaceAll('return publish(remoteCache)','return remoteCache').replace("return publish({sha:'',db:null,exportedAt:''})","return {sha:'',db:null,exportedAt:''}");
+ restored=restored.replace(/ if\(!window\.WarehouseTransferWarnings\.confirm\([^\n]+\n/g,'');
  for(const name of ['addExpress','recover','formatTrackingDisplayW96']){
   const previous=fn(original,name),current=fn(restored,name);restored=restored.replace(current,previous);
  }

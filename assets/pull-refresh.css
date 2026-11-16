@@ -17,3 +17,5 @@ html.warehouse-pull-refresh-enabled body { overscroll-behavior-y: none; }
   pointer-events: none;
 }
 .warehouse-pull-refresh[hidden] { display: none; }
+
+.warehouse-pull-refresh{transition:background-color .16s,border-color .16s,color .16s}.warehouse-pull-refresh.is-ready{background:#c9edda;border-color:#a1d7ba;color:#24513c}

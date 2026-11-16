@@ -2143,8 +2143,8 @@ input[type="checkbox"],input[type="radio"]{flex-shrink:0}
 <link rel="stylesheet" href="assets/inbound-controls.css">
 <link rel="stylesheet" href="assets/photos/photos.css?v=20261117-gallery">
 <link rel="stylesheet" href="assets/tail-collisions.css?v=20261117">
-<link rel="stylesheet" href="assets/photo-gallery.css?v=20261117">
-<link rel="stylesheet" href="assets/pull-refresh.css?v=20261117">
+<link rel="stylesheet" href="assets/photo-gallery.css?v=20261117-motion">
+<link rel="stylesheet" href="assets/pull-refresh.css?v=20261117-ready">
 </head>
 <body>
 <div class="wrap">
@@ -5571,6 +5571,7 @@ function prepareBulkPalletMoveV65(){
 }
 
 async function executeBulkPalletMoveV65(ids,target){
+ if(!window.WarehouseTransferWarnings.confirm(db.items,db.items.filter(x=>ids.includes(Number(x.id))),target))return false;
  const changed=[];
 
  db.items.forEach(function(x){
@@ -6117,6 +6118,7 @@ function executeSelectedTransfer(){
    return;
  }
 
+ if(!window.WarehouseTransferWarnings.confirm(db.items,db.items.filter(x=>p.ids.includes(Number(x.id))&&x.pallet===p.from),p.to))return false;
  let count=0;
  db.items.forEach(x=>{
    if(
@@ -6186,6 +6188,7 @@ function confirmTransfer(){
  }
 
  // Fallback if confirm modal doesn't exist
+ if(!window.WarehouseTransferWarnings.confirm(db.items,items,to))return false;
  items.forEach(x=>{x.pallet=to;x.updatedAt=new Date().toLocaleString();});
  selectedPalletIds.clear();
  save();
@@ -7881,11 +7884,12 @@ window.warehouseGitHubGuard20261023=guard;async function report(fn){try{return a
 <script src="assets/inbound-controls.js"></script>
 <script src="assets/photos/store.js?v=20261114"></script>
 <script src="assets/photos/github.js?v=20261112"></script>
-<script src="assets/photo-gallery.js?v=20261117"></script>
+<script src="assets/photo-gallery.js?v=20261117-motion"></script>
 <script src="assets/photos/ui.js?v=20261117-gallery"></script>
 <script src="assets/tail-collisions.js?v=20261117"></script>
 <script src="assets/collision-ui.js?v=20261117"></script>
-<script src="assets/pull-refresh.js?v=20261117"></script>
+<script src="assets/transfer-warnings.js?v=20261117-b"></script>
+<script src="assets/pull-refresh.js?v=20261117-ready"></script>
 <script src="assets/sync-recovery.js?v=20261112"></script>
 <link rel="stylesheet" href="assets/query-access.css?v=20261115">
 <script src="assets/vendor/pako_deflate-2.1.0.min.js"></script>

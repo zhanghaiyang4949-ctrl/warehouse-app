@@ -37,3 +37,8 @@ test('late resolutions cannot replace selection or closed viewer; teardown resto
  assert.equal([...handle.element.events.values()].reduce((sum,set)=>sum+set.size,0),0);
  handle.close();assert.equal(closes,1);delete global.document;
 });
+
+test('horizontal photo follows finger, insufficient swipe springs back, and successful swipe selects next',async()=>{
+ const doc=new Element('document');doc.body=new Element('body');doc.createElement=tag=>new Element(tag);global.document=doc;const handle=gallery.open({records:[{id:'a'},{id:'b'}],loadImage:async row=>'blob:'+row.id});await tick();const layer=handle.element,image=layer.children.find(x=>x.tagName==='img');
+ const dispatch=(type,x)=>{for(const fn of layer.events.get(type)||[])fn({target:image,touches:type==='touchend'?[]:[{clientX:x,clientY:100}],changedTouches:[{clientX:x,clientY:100}],cancelable:true,preventDefault(){}});};dispatch('touchstart',200);dispatch('touchmove',175);assert.ok(image.style.transform.includes('-25px'));dispatch('touchend',175);assert.equal(handle.index,0);assert.equal(image.style.transform,'');dispatch('touchstart',200);dispatch('touchmove',100);assert.ok(image.style.transform.includes('-100px'));dispatch('touchend',100);assert.equal(handle.index,1);handle.close();delete global.document;
+});

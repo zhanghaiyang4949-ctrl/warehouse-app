@@ -19,7 +19,7 @@
   const BLOCKED = 'input,textarea,select,button,a,[contenteditable]:not([contenteditable="false"]),[role="dialog"],.modalMask,.v5-scanner-layer,.warehouse-photo-viewer,.warehouse-photo-editor';
   function createController(options) {
     const doc = options.document, win = options.window;
-    const threshold = options.threshold || 180;
+    const threshold = options.threshold || 240;
     let gesture = null, destroyed = false;
     const atTop = () => (doc.scrollingElement || doc.documentElement).scrollTop <= 0 && !(win.scrollY > 0);
     function excluded(target) {
@@ -86,10 +86,14 @@
       const style = win.getComputedStyle(node);
       return style.display !== 'none' && style.visibility !== 'hidden' && node.getClientRects().length > 0;
     });
+    let ready=false,notified=false;
     const controller = createController({ ...options,
       canStart: event => !visibleDialog() && options.canStart?.(event) !== false,
       onProgress(distance, threshold) {
         indicator.hidden = distance <= 0;
+        const reached=distance>=threshold;indicator.className='warehouse-pull-refresh'+(reached?' is-ready':'');
+        if(reached&&!ready&&!notified){notified=true;try{win.navigator?.vibrate?.(12);}catch{}}
+        ready=reached;if(distance<=0)notified=false;
         const text = distance >= threshold ? '松开刷新' : '继续下拉刷新';
         if (indicator.textContent !== text) indicator.textContent = text;
         options.onProgress?.(distance, threshold);

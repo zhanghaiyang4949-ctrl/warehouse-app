@@ -19,8 +19,8 @@ test('short downward gesture is intercepted but does not refresh', () => {
   const f = fixture(); f.send('touchstart'); assert.equal(f.send('touchmove', 0, 70).prevented, true); f.send('touchend'); assert.equal(f.refreshes, 0); assert.equal(f.progress.at(-1), 0);
   assert.equal(f.handlers.get('touchmove').config.passive, false);
 });
-test('180 CSS pixel deliberate pull refreshes once on release', () => {
-  const f = fixture(); f.send('touchstart', 10, 25); f.send('touchmove', 12, 205); assert.equal(f.refreshes, 0); f.send('touchend'); f.send('touchend'); assert.equal(f.refreshes, 1);
+test('240 CSS pixel deliberate pull refreshes once on release', () => {
+  const f = fixture(); f.send('touchstart', 10, 25); f.send('touchmove', 12, 265); assert.equal(f.refreshes, 0); f.send('touchend'); f.send('touchend'); assert.equal(f.refreshes, 1);
 });
 test('horizontal swipe stays untouched even if later turned downward', () => {
   const f = fixture(); f.send('touchstart'); assert.equal(f.send('touchmove', 70, 8).prevented, false); f.send('touchmove', 70, 260); f.send('touchend'); assert.equal(f.refreshes, 0);
@@ -65,10 +65,15 @@ test('install confirms only tracking/note drafts; cancel preserves inputs and de
     f.win.confirm = () => { prompts++; return false; };
     f.win.location = { reload() { reloads++; } };
     const installed = install({ document: f.doc, window: f.win });
-    f.send('touchstart'); f.send('touchmove', 0, 180); f.send('touchend');
+    f.send('touchstart'); f.send('touchmove', 0, 240); f.send('touchend');
     assert.equal(prompts, field === 'inPallet' ? 0 : 1);
     assert.equal(reloads, field === 'inPallet' ? 1 : 0);
     assert.equal(fields[field].value, 'draft');
     installed.destroy();
   }
+});
+
+test('ready indicator is green; vibration occurs only once per gesture and unsupported devices still work',()=>{
+ const f=fixture();f.controller.destroy();let pulses=0;const indicator={setAttribute(){},remove(){},className:''};f.doc.getElementById=()=>null;f.doc.querySelectorAll=()=>[];f.doc.documentElement.classList={add(){},remove(){}};f.doc.createElement=()=>indicator;f.doc.body.appendChild=()=>{};f.win.navigator={vibrate:ms=>{assert.equal(ms,12);pulses++;}};const installed=install({document:f.doc,window:f.win,onRefresh(){}});
+ f.send('touchstart');f.send('touchmove',0,239);assert.ok(!indicator.className.includes('is-ready'));f.send('touchmove',0,240);assert.ok(indicator.className.includes('is-ready'));f.send('touchmove',0,200);f.send('touchmove',0,260);assert.equal(pulses,1);f.send('touchend');f.win.navigator={};f.send('touchstart');f.send('touchmove',0,260);assert.ok(indicator.className.includes('is-ready'));f.send('touchend');installed.destroy();
 });

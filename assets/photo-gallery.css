@@ -12,3 +12,5 @@
 .warehouse-photo-gallery :focus-visible{outline:3px solid #78c9ff;outline-offset:3px}
 .warehouse-photo-gallery-thumbnails{display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;padding-bottom:4px}
 .warehouse-photo-gallery-thumbnails>*{flex:0 0 auto}
+
+.warehouse-photo-gallery>img.warehouse-photo-gallery-image{touch-action:pan-y pinch-zoom;will-change:transform}.warehouse-photo-gallery>img.warehouse-photo-gallery-outgoing{object-fit:contain;z-index:1;pointer-events:none}.warehouse-photo-gallery{overflow-x:hidden}

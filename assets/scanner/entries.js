@@ -32,19 +32,29 @@ function install(){
    button=document.createElement('button');button.type='button';button.className='gray v5-entry-button';button.textContent='扫码';button.dataset.v5Target=id;
    input.insertAdjacentElement('afterend',button);
   }
+  let photo=input.parentElement.querySelector('[data-v6-photo-target="'+id+'"]');
+  if(!photo){photo=document.createElement('button');photo.type='button';photo.className='gray v5-entry-button';photo.textContent='照片';photo.dataset.v6PhotoTarget=id;button.insertAdjacentElement('afterend',photo)}
+  const onResult=result=>{
+   if(!visible(input))return {accepted:false,message:'原页面已切换'};
+   return applyScan(id,input,result.text,{query:()=>root.findExpress(),count:()=>root.updatePackOrderCountV83()});
+  };
+  photo.onclick=()=>{
+   if(config.protect&&input.value.trim()){root.toast('请先确认或清空原单号，再扫码');return}
+   root.WarehouseV6Photos.open({title:config.title.replace('扫码','照片识别'),isCurrent:()=>visible(input),onResult});
+  };
   button.onclick=()=>{
+   root.WarehouseV6Photos?.close();
    if(config.protect&&input.value.trim()){root.toast('请先确认或清空原单号，再扫码');return}
    root.V5Scanner.openScanner({mode:config.mode,title:config.title,batch:!!config.batch,
     isCurrent:()=>visible(input),
-    onResult:result=>{
-     if(!visible(input))return {accepted:false,message:'原页面已切换'};
-     return applyScan(id,input,result.text,{query:()=>root.findExpress(),count:()=>root.updatePackOrderCountV83()});
-    }});
+    onResult});
   };
  }
+ const closeAll=()=>{root.V5Scanner.closeScanner();root.WarehouseV6Photos?.close()};
+ const checkCurrent=()=>{if(root.V5Scanner.isOpen()&&!root.V5Scanner.isCurrent())root.V5Scanner.closeScanner();if(root.WarehouseV6Photos?.isOpen()&&!root.WarehouseV6Photos.isCurrent())root.WarehouseV6Photos.close()};
  // Observe page and tab visibility without changing any existing business function.
- new MutationObserver(()=>{if(root.V5Scanner.isOpen()&&!root.V5Scanner.isCurrent())root.V5Scanner.closeScanner()}).observe(document.querySelector('.wrap')||document.body,{subtree:true,attributes:true,attributeFilter:['class','style','hidden']});
- document.addEventListener('click',e=>{if(e.target.closest('.warehouse-blank-button'))root.V5Scanner.closeScanner()},true);
+ new MutationObserver(checkCurrent).observe(document.querySelector('.wrap')||document.body,{subtree:true,attributes:true,attributeFilter:['class','style','hidden']});
+ document.addEventListener('click',e=>{if(e.target.closest('.warehouse-blank-button'))closeAll()},true);
  document.addEventListener('keydown',e=>{
   if(!root.V5Scanner.isOpen())return;
   if(e.key==='Escape')root.V5Scanner.closeScanner();
@@ -55,11 +65,12 @@ function install(){
    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}
   }
  });
- document.addEventListener('visibilitychange',()=>{if(document.hidden)root.V5Scanner.closeScanner()});
- new MutationObserver(()=>{if(root.V5Scanner.isOpen()&&!root.V5Scanner.isCurrent())root.V5Scanner.closeScanner()}).observe(document.body,{childList:true});
- window.addEventListener('popstate',()=>root.V5Scanner.closeScanner());
- window.addEventListener('pagehide',()=>root.V5Scanner.closeScanner());
- window.addEventListener('beforeunload',()=>root.V5Scanner.closeScanner());
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)closeAll()});
+ new MutationObserver(checkCurrent).observe(document.body,{childList:true,subtree:true});
+ window.addEventListener('popstate',closeAll);
+ window.addEventListener('hashchange',closeAll);
+ window.addEventListener('pagehide',closeAll);
+ window.addEventListener('beforeunload',closeAll);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install);else install();
 })(typeof window!=='undefined'?window:globalThis);

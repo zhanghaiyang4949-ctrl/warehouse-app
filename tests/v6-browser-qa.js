@@ -1,0 +1,15 @@
+(async()=>{
+ const output=document.createElement('pre');output.id='v6-qa-result';document.body.append(output);const results=[],check=(name,value)=>{results.push({name,pass:!!value});output.textContent=JSON.stringify(results);if(!value)throw Error(name);},wait=async(fn,ms=10000)=>{const until=performance.now()+ms;while(performance.now()<until){if(fn())return;await new Promise(r=>setTimeout(r,30));}throw Error('等待超时');};
+ const image=url=>new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('样本加载失败'));img.src=url;});let timer;
+ try{
+  const truth=await(await fetch('tests/fixtures/v6/truth.json')).json();
+  for(const [file,text] of Object.entries(truth.expected)){const rows=await WarehouseV6.decode(await image('tests/fixtures/v6/'+file),{heavy:true});check('真实WASM '+file,rows.some(x=>x.text===text&&x.engine==='ZXing-C++ WASM'));}
+  const secondary=await WarehouseV6.decode(await image('tests/fixtures/v6/code128-normal.svg'),{heavy:true,engine:'zbar'});check('真实ZBar补充引擎可读一维码',secondary.some(x=>x.text==='123456789012345678'&&x.engine==='ZBar WASM'));
+  const blank=document.createElement('canvas');blank.width=320;blank.height=240;const b=blank.getContext('2d');b.fillStyle='white';b.fillRect(0,0,320,240);check('空白图不产生条码',(await WarehouseV6.decode(blank,{heavy:true})).length===0);
+  const aborted=new AbortController();aborted.abort();let abortOK=false;try{await WarehouseV6.decode(blank,{signal:aborted.signal});}catch(error){abortOK=error.name==='AbortError';}check('已取消任务不继续识别',abortOK);
+  const frame=document.createElement('canvas');frame.width=1280;frame.height=720;const ctx=frame.getContext('2d'),barcode=await image('tests/fixtures/v6/code128-normal.svg');const draw=()=>{ctx.fillStyle='white';ctx.fillRect(0,0,1280,720);ctx.drawImage(barcode,300,260,680,180);};draw();timer=setInterval(draw,80);const stream=frame.captureStream(12);const original=navigator.mediaDevices.getUserMedia;navigator.mediaDevices.getUserMedia=async()=>stream;
+  try{let seen=[];await V6Scanner.openScanner({mode:'single',isCurrent:()=>true,onResult:r=>seen.push(r.text)});await wait(()=>seen.length);check('真实视频帧经V6只返回一次完整单号',seen.length===1&&seen[0]==='123456789012345678');check('单次完成关闭摄像头',stream.getTracks().every(t=>t.readyState==='ended'));}finally{navigator.mediaDevices.getUserMedia=original;V6Scanner.closeScanner();clearInterval(timer);}
+  timer=setInterval(draw,80);const fallbackFrame=frame.captureStream(12);const orig=navigator.mediaDevices.getUserMedia;navigator.mediaDevices.getUserMedia=async()=>fallbackFrame;try{await V6Scanner.openScanner({mode:'continuous',isCurrent:()=>true,onResult(){}});document.querySelector('[data-v5="legacy"]').click();check('V5回退窗口可打开',LegacyV5Scanner.isOpen());V5Scanner.closeScanner();check('统一关闭也释放V5回退',!LegacyV5Scanner.isOpen());}finally{navigator.mediaDevices.getUserMedia=orig;}
+ }catch(error){results.push({error:error.message,stack:error.stack});}
+ finally{clearInterval(timer);WarehouseV6.reset();output.textContent=JSON.stringify(results);}
+})();

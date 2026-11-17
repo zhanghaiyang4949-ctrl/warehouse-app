@@ -1,0 +1,14 @@
+{
+  "zxingWasm": "3.1.7",
+  "zbarWasm": "0.11.0",
+  "npmIntegrity": {
+    "zxing-wasm-3.1.7.tgz": "sha512-LI94ndlOY+xoqlkNcc0EwByrMpUXKrCX171EQ38kGWqpiRq/gcnC+ZrbRipvxI3uV4LaDtNlKo1p9Uayg1sesQ==",
+    "undecaf-zbar-wasm-0.11.0.tgz": "sha512-z2UZ+Uc50+qyE+HbU+Obdk/E5ecB7xYiu0i99bHQ9VlZVH0JMmE/5mJQa16Cutvwt80C9OZl8jEVayf5s5Azow=="
+  },
+  "sha256": {
+    "zxing-wasm-3.1.7.js": "1c61f43ac68da5c242f58c0d05763c295cd8a605d46d14bc31821eee7160e778",
+    "zxing_reader.wasm": "33c8c50be17d0bb05454b4fd3ffb5b5ab9a8e8d1c0ebeb21a1adf4a89c1a8b59",
+    "zbar-0.11.0.js": "31ba69c462230c7c7333e5eb75fb3d694b2c8b4ac8430dd7f9f74a62cf92160a",
+    "zbar.wasm": "438f95e4b5d122c4c2a8da2b72ad19faa4ba4e541f473dcae0371e4cfc8159ee"
+  }
+}

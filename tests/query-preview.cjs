@@ -49,7 +49,7 @@ const managerTests=`<script>
 (async()=>{
  const tests=[],check=(name,ok)=>{tests.push({name,pass:!!ok});if(!ok)throw Error(name);},wait=async fn=>{for(let i=0;i<300;i++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('界面等待超时');};
  try{
-  await wait(()=>storageReady&&document.querySelector('.query-access'));
+  await wait(()=>storageReady&&document.querySelector('.query-access'));if(location.pathname.includes('inbound-check.html')){check('诊断版标记清晰可见',document.body.textContent.includes('入库诊断版 2026-11-17 D1'));failInbound('诊断测试：错误应持续显示');check('完整错误在诊断面板中保留',document.querySelector('section[role="status"]').textContent.includes('诊断测试：错误应持续显示'));}
   document.getElementById('ghOwnerV44').value='fixture-owner';document.getElementById('ghRepoV44').value='fixture-backup';document.getElementById('ghBranchV44').value='main';document.getElementById('ghTokenV44').value='fixture-token';await warehouseGitHubGuard20261023.inspect();document.getElementById('inExpress').value='TEST-INBOUND-9012';document.getElementById('inCustomer').value='入库验收';document.getElementById('inDate').value='2026-11-17';document.getElementById('palletInput').value='A-1-1-1';document.getElementById('palletAssist').checked=false;const inboundOK=await addExpress();check('实际入库保存流程成功：'+(window.__inboundFailureStack||document.getElementById('toast').textContent),inboundOK===true);check('已保存入库可从IndexedDB读取',(await new Promise((resolve,reject)=>{const tx=idbHandle.transaction('state','readonly');const req=tx.objectStore('state').get('main');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);})).data.items.some(x=>x.express==='TEST-INBOUND-9012'));
   check('管理端显示规则覆盖纯数字和中英文单号',formatTrackingDisplayW96('888877775555')==='8888-7777-5555'&&formatTrackingDisplayW96('车入suki261112')==='车入suki261112');
   document.getElementById('inExpress').value='888877775555';updateInboundContext();check('待入库预览分组且输入原值不变',document.getElementById('ctxExpressW95').textContent==='8888-7777-5555'&&document.getElementById('inExpress').value==='888877775555');
@@ -91,7 +91,7 @@ http.createServer(async(req,res)=>{
  const isManager=url.pathname.startsWith('/admin/'),root=isManager?manager:client,relative=decodeURIComponent(url.pathname.replace(/^\/(admin|client)\//,'')),file=path.resolve(root,relative||'index.html');
  if(!file.startsWith(root+path.sep)){res.writeHead(403);res.end();return;}
  try{
-  let contents=fs.readFileSync(file);if(file.endsWith('index.html')){
+  let contents=fs.readFileSync(file);if(file.endsWith('index.html')||file.endsWith('inbound-check.html')){
    let html=contents.toString();html=html.replace('<head>','<head>'+transport);
    if(!isManager)html=html.replace('<script src="assets/secure-client.js','<script>window.WarehouseQueryConfig={endpoint:"https://query.fixture/"};</script><script src="assets/secure-client.js');
    html=html.replace('</body>',(isManager?managerTests:clientTests)+'</body>');contents=Buffer.from(html);

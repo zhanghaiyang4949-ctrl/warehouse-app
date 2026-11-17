@@ -24,5 +24,21 @@
   const cx=(box.x+box.width/2)/width,cy=(box.y+box.height/2)/height;if(cx<.3||cx>.7||cy<.3||cy>.7||box.width/width>=.32||box.height/height>=.65)return null;
   const step=c.step||.1,next=Math.min(c.max,2.5,Math.round((z+.2)/step)*step);return next>z+.05?next:null;
  }
- const api={coverROI,contrast,unique,stripeBox,nextZoom};if(typeof module==='object'&&module.exports)module.exports=api;else root.WarehouseV6Pixels=api;
+ function boundsFromPoints(position,width,height){
+  if(!position||!(width>0&&height>0))return null;
+  const points=(Array.isArray(position)?position:Object.values(position)).filter(p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y));
+  if(points.length<2)return null;
+  const xs=points.map(p=>p.x/width),ys=points.map(p=>p.y/height),left=Math.max(0,Math.min(...xs)),right=Math.min(1,Math.max(...xs)),top=Math.max(0,Math.min(...ys)),bottom=Math.min(1,Math.max(...ys));
+  if(right<left||bottom<top||(right===left&&bottom===top))return null;
+  const round=v=>Math.round(v*1e9)/1e9;return {x:round(left),y:round(top),width:round(right-left),height:round(bottom-top)};
+ }
+ function mapVideoBounds(bounds,roi,vw,vh,cw,ch){
+  if(!bounds||![bounds.x,bounds.y,bounds.width,bounds.height,roi?.x,roi?.y,roi?.width,roi?.height,vw,vh,cw,ch].every(Number.isFinite)||Math.min(vw,vh,cw,ch)<=0||bounds.width<0||bounds.height<0)return null;
+  const scale=Math.max(cw/vw,ch/vh),ox=(cw-vw*scale)/2,oy=(ch-vh*scale)/2;
+  const left=(roi.x+bounds.x*roi.width)*scale+ox,top=(roi.y+bounds.y*roi.height)*scale+oy,right=left+bounds.width*roi.width*scale,bottom=top+bounds.height*roi.height*scale;
+  if(right<=0||left>=cw||bottom<0||top>ch)return null;
+  const x1=Math.max(0,left),x2=Math.min(cw,right),y1=Math.max(0,top),y2=Math.min(ch,bottom),width=Math.min(cw,Math.max(28,x2-x1)),height=Math.min(ch,Math.max(28,y2-y1));
+  return {x:Math.max(0,Math.min(cw-width,(x1+x2-width)/2)),y:Math.max(0,Math.min(ch-height,(y1+y2-height)/2)),width,height};
+ }
+ const api={coverROI,contrast,unique,stripeBox,nextZoom,boundsFromPoints,mapVideoBounds};if(typeof module==='object'&&module.exports)module.exports=api;else root.WarehouseV6Pixels=api;
 })(typeof self==='undefined'?globalThis:self);

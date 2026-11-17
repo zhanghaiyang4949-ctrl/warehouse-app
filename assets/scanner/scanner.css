@@ -39,3 +39,12 @@
 @media(max-width:650px){.inboundStickyExpressV61:has([data-v6-photo-target])>.v5-entry-button,.sortScanRowW99:has([data-v6-photo-target])>.v5-entry-button,.findInputWithKeyboard:has([data-v6-photo-target])>.v5-entry-button{min-width:42px!important;padding:8px 6px!important;font-size:13px!important}.v6-photo-dialog{max-height:100dvh}.findInputWithKeyboard:has([data-v6-photo-target])>input{min-width:0}}
 
 #dataManageTools .dataSearchLine:has([data-v6-photo-target]){grid-template-columns:minmax(0,3fr) repeat(4,minmax(0,1fr));gap:4px}#dataManageTools .dataSearchLine:has([data-v6-photo-target])>button{min-width:0!important;padding:8px 2px!important;font-size:12px!important}
+.v6-photo-preview{position:relative;width:100%;line-height:0;margin:12px 0;background:#000;border-radius:8px;overflow:hidden}
+.v6-photo-preview[hidden]{display:none!important}
+.v6-photo-image{display:block;width:100%;height:auto;margin:0}
+.v6-photo-preview .v6-photo-marker{position:absolute;display:flex;align-items:flex-start;justify-content:flex-start;min-height:0;min-width:0;box-sizing:border-box;margin:0;padding:2px;border:3px solid #60f7a0;border-radius:4px;background:#00a14a25;color:#fff;font-size:16px;font-weight:800;line-height:1;text-shadow:0 1px 3px #000;box-shadow:0 0 0 1px #0008;overflow:visible;cursor:pointer}
+.v6-photo-preview .v6-photo-marker:focus-visible{outline:3px solid #fff;outline-offset:2px;background:#008d4d80}
+
+.v6-camera-frozen{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2}.v6-code-overlay{position:absolute;inset:0;z-index:4;pointer-events:none;overflow:hidden}.v5-scanner-dialog .v6-code-marker{position:absolute;pointer-events:auto;box-sizing:border-box;border:3px solid #65efb0;background:#183c2540;color:#fff;font-size:15px;min-height:0;min-width:0;margin:0;padding:2px;border-radius:7px;line-height:1;box-shadow:0 0 0 1px #123b2e;display:flex;align-items:center;justify-content:center}.v6-code-marker:focus-visible{outline:3px solid #fff;outline-offset:2px}.v6-choice-list{display:grid;gap:7px;margin-top:12px}.v6-code-list-button{text-align:left;overflow-wrap:anywhere;width:100%}
+
+.v6-photo-preview .v6-photo-marker{min-height:28px;min-width:28px}

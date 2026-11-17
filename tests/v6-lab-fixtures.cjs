@@ -31,3 +31,14 @@ for(const [name,angle,foreground,background] of [['code128-normal',0,'#000','#ff
 fs.writeFileSync(path.join(out,'truth.json'),JSON.stringify({notice:'Generated QR and Code128C fixtures only; not evidence of real phone-photo quality. Code128 patterns are from bundled Apache-licensed ZXing Code128Reader; normal row self-check passes.',expected:truth},null,2)+'\n');
 fs.writeFileSync(path.join(out,'truth.tsv'),Object.entries(truth).map(([file,value])=>file+'\t'+value).join('\n')+'\n');
 console.log('Generated 6 deterministic QR / Code128C SVG fixtures; Code128C reader self-check passed.');
+// Keep the six single-image truth entries stable; multi-code truth is a sidecar.
+function linearRects(value){
+ const values=value.match(/../g).map(Number),sum=(start+values.reduce((n,v,i)=>n+v*(i+1),0))%103;
+ let x=12;const rects=[],row=new ZXing.BitArray();for(let i=0;i<12;i++)row.appendBit(false);
+ for(const symbol of [start,...values,sum,ZXing.Code128Reader.CODE_STOP]){let dark=true;for(const width of ZXing.Code128Reader.CODE_PATTERNS[symbol]){if(dark)rects.push(`<rect x="${x*3}" y="45" width="${width*3}" height="150"/>`);for(let i=0;i<width;i++)row.appendBit(dark);x+=width;dark=!dark}}
+ for(let i=0;i<12;i++)row.appendBit(false);if(new ZXing.Code128Reader().decodeRow(0,row,new Map()).getText()!==value)throw Error('Multi-code fixture self-check failed');return rects.join('');
+}
+const secondText='987654321098765432';
+fs.writeFileSync(path.join(out,'code128-multiple.svg'),`<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800"><rect width="1000" height="800" fill="white"/><g fill="black" transform="translate(80 60)">${linearRects(codeText)}</g><g fill="black" transform="translate(80 440)">${linearRects(secondText)}</g></svg>\n`);
+fs.writeFileSync(path.join(out,'multi-truth.json'),JSON.stringify({notice:'Deterministic synthetic two-Code128C image; not real phone-photo evidence.',file:'code128-multiple.svg',width:1000,height:800,expected:[{text:codeText,region:{x:.08,y:.075,width:.8,height:.3}},{text:secondText,region:{x:.08,y:.55,width:.8,height:.3}}]},null,2)+'\n');
+console.log('Generated distinct two-Code128C fixture and separate multi-truth.json.');

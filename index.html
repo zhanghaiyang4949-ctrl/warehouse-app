@@ -5180,6 +5180,7 @@ async function addExpress(){
 
  const attachedPhotos=window.WarehousePhotos?.prepareInbound(item)||[];
  const restorePhotos=()=>{if(attachedPhotos.length){const ids=new Set(attachedPhotos.map(row=>row.id));db.photoAttachments=(db.photoAttachments||[]).filter(row=>!ids.has(row.id));}};
+ let committed=false;
  try{
    db.items.push(item);
    if(attachedPhotos.length)db.photoAttachments=(db.photoAttachments||[]).concat(attachedPhotos);
@@ -5196,6 +5197,7 @@ async function addExpress(){
      refresh();
      return failInbound("入库失败：数据未能安全保存");
    }
+   committed=true;
    if(expressInput)expressInput.value="";
    window.WarehousePhotos?.inboundSaved(attachedPhotos);
    renderRecentInbound();renderLastInboundW95();updateInboundContext();showInboundSuccessFeedback();
@@ -5203,9 +5205,12 @@ async function addExpress(){
    toast("入库成功");
    return true;
  }catch(e){
-   // Roll back the pushed record if save/render fails after insertion.
+   const detail=String(e&&e.message||e||'未知错误');
+   console.error('Inbound operation failed',e);
+   if(committed){toast('已入库，但界面更新失败：'+detail+'。请勿重复入库，可到数据页核对');return true;}
    db.items=db.items.filter(x=>Number(x.id)!==Number(item.id));restorePhotos();
-   return failInbound("入库失败");
+   if(customer&&customerUsage[customer])customerUsage[customer]=Math.max(0,customerUsage[customer]-1);
+   return failInbound('入库失败：'+detail);
  }
 }
 function toggleFindKeyboard(){

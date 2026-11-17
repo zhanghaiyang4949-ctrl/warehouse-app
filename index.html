@@ -2994,6 +2994,17 @@ function updateStorageStatusV44(){
   '<span>最后本地保存：'+localSave+'</span>'+
   '<span>本机最近上传备份：'+gh+'</span>';
 }
+function writeAuxiliaryStorageV20261117(key,value){
+ try{localStorage.setItem(key,value);return true;}catch(error){return false;}
+}
+function releaseVerifiedMirrorV20261117(state){
+ try{
+  if(!state||!state.data||!Array.isArray(state.data.items))return false;
+  const raw=localStorage.getItem(KEY);if(!raw)return false;
+  if(JSON.stringify(JSON.parse(raw))!==JSON.stringify(state.data))return false;
+  localStorage.removeItem(KEY);return true;
+ }catch(error){return false;}
+}
 async function initializeSafeStorageV44(){
  storageReadError=false;
  storageReady=false;
@@ -3024,6 +3035,7 @@ async function initializeSafeStorageV44(){
     return;
    }
 
+   releaseVerifiedMirrorV20261117({data:loaded});
    db=loaded;
    lastKnownRecordCount=Math.max(lastKnownRecordCount,recordedCount,loadedCount);
    lastLocalSaveAt=state.savedAt||lastLocalSaveAt||new Date().toISOString();
@@ -3031,14 +3043,14 @@ async function initializeSafeStorageV44(){
    storageReady=true;
    clearStorageEmergencyV44();
 
-   localStorage.setItem("warehouseLastKnownCountV44",String(lastKnownRecordCount));
-   localStorage.setItem("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
-   try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){}
+   writeAuxiliaryStorageV20261117("warehouseLastKnownCountV44",String(lastKnownRecordCount));
+   writeAuxiliaryStorageV20261117("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
+   /* IndexedDB 已保存主数据，不再向小容量缓存重复写整库。 */
 
    const normalizedCountV59=normalizeAllStoredDatesV59();
    if(normalizedCountV59>0){
      await idbPutMainStateV44();
-     try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){}
+     /* IndexedDB 已保存主数据，不再向小容量缓存重复写整库。 */
    }
 
    updateStorageStatusV44();
@@ -3063,13 +3075,13 @@ async function initializeSafeStorageV44(){
    lastKnownRecordCount=Math.max(lastKnownRecordCount,db.items.length);
    lastLocalSaveAt=new Date().toISOString();
 
-   localStorage.setItem("warehouseLastKnownCountV44",String(lastKnownRecordCount));
-   localStorage.setItem("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
+   writeAuxiliaryStorageV20261117("warehouseLastKnownCountV44",String(lastKnownRecordCount));
+   writeAuxiliaryStorageV20261117("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
 
    const normalizedCountV59=normalizeAllStoredDatesV59();
    if(normalizedCountV59>0){
      await idbPutMainStateV44();
-     try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){}
+     /* IndexedDB 已保存主数据，不再向小容量缓存重复写整库。 */
    }
 
    updateStorageStatusV44();
@@ -3094,8 +3106,8 @@ async function initializeSafeStorageV44(){
   await idbPutMainStateV44();
 
   lastLocalSaveAt=new Date().toISOString();
-  localStorage.setItem("warehouseLastKnownCountV44","0");
-  localStorage.setItem("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
+  writeAuxiliaryStorageV20261117("warehouseLastKnownCountV44","0");
+  writeAuxiliaryStorageV20261117("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
 
   updateStorageStatusV44();
   refresh();
@@ -3139,8 +3151,8 @@ async function recheckStorageV45(){
     lastLocalSaveAt=state.savedAt||lastLocalSaveAt;
 
     clearStorageEmergencyV44();
-    localStorage.setItem("warehouseLastKnownCountV44",String(lastKnownRecordCount));
-    if(lastLocalSaveAt)localStorage.setItem("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
+    writeAuxiliaryStorageV20261117("warehouseLastKnownCountV44",String(lastKnownRecordCount));
+    if(lastLocalSaveAt)writeAuxiliaryStorageV20261117("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
 
     updateStorageStatusV44();
     refresh();
@@ -3164,35 +3176,22 @@ function safePersistV44(reason,forceSnapshot){
   showStorageEmergencyV44("数据库当前不是安全可写状态，本次保存已被阻止。");
   return Promise.resolve(false);
  }
-
  storageWriteQueue=storageWriteQueue.then(async function(){
-  try{
-   await idbPutMainStateV44();
-   lastLocalSaveAt=new Date().toISOString();
-   lastKnownRecordCount=Math.max(lastKnownRecordCount,Array.isArray(db.items)?db.items.length:0);
-
-   localStorage.setItem("warehouseLastKnownCountV44",String(lastKnownRecordCount));
-   localStorage.setItem("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
-
-   // 冗余镜像；主数据库仍然是 IndexedDB。
-   try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){}
-
-   snapshotChangeCounter++;
-   if(forceSnapshot || snapshotChangeCounter>=20){
-    await idbAddSnapshotV44(reason||"自动快照");
-    snapshotChangeCounter=0;
-    trimSnapshotsV44();
-   }
-
-   updateStorageStatusV44();
-   scheduleQuerySyncV73();
-   return true;
-  }catch(err){
-   showStorageEmergencyV44("保存失败："+(err&&err.message?err.message:String(err))+"。后续自动写入已停止。");
-   return false;
+  try{await idbPutMainStateV44();}
+  catch(err){showStorageEmergencyV44("主数据库保存失败："+(err&&err.message?err.message:String(err))+"。后续自动写入已停止。");return false;}
+  lastLocalSaveAt=new Date().toISOString();
+  lastKnownRecordCount=Math.max(lastKnownRecordCount,Array.isArray(db.items)?db.items.length:0);
+  writeAuxiliaryStorageV20261117("warehouseLastKnownCountV44",String(lastKnownRecordCount));
+  writeAuxiliaryStorageV20261117("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
+  snapshotChangeCounter++;
+  if(forceSnapshot || snapshotChangeCounter>=20){
+   try{await idbAddSnapshotV44(reason||"自动快照");snapshotChangeCounter=0;trimSnapshotsV44();}
+   catch(err){console.warn('主库存已保存，辅助自动快照未完成',err);}
   }
+  try{updateStorageStatusV44();scheduleQuerySyncV73();}
+  catch(err){console.warn('主库存已保存，状态更新未完成',err);}
+  return true;
  });
-
  return storageWriteQueue;
 }
 let currentPallet=localStorage.getItem("currentPallet")||"";
@@ -3214,8 +3213,8 @@ let dataSortDirection="asc";
 let dataPageSize=Number(localStorage.getItem("dataPageSizeV1")||10);
 if(localStorage.getItem("dataPageSizeDefaultW96")!=="1"){
  dataPageSize=10;
- localStorage.setItem("dataPageSizeV1","10");
- localStorage.setItem("dataPageSizeDefaultW96","1");
+ writeAuxiliaryStorageV20261117("dataPageSizeV1","10");
+ writeAuxiliaryStorageV20261117("dataPageSizeDefaultW96","1");
 }
 let dataCurrentPage=1;
 let selectedPalletIds=new Set();
@@ -3953,12 +3952,12 @@ async function deleteTransferWebMsgV90(id){
 
 
 function save(){
- localStorage.setItem("currentPallet",currentPallet);
- localStorage.setItem("customerUsageV1",JSON.stringify(customerUsage));
+ writeAuxiliaryStorageV20261117("currentPallet",currentPallet);
+ writeAuxiliaryStorageV20261117("customerUsageV1",JSON.stringify(customerUsage));
  const ci=document.getElementById("inCustomer"), pi=document.getElementById("palletInput"), di=document.getElementById("inDate");
- if(ci) localStorage.setItem("inCustomerV1",ci.value);
- if(pi) localStorage.setItem("inPalletV1",pi.value);
- if(di) localStorage.setItem("inDateV1",di.value);
+ if(ci) writeAuxiliaryStorageV20261117("inCustomerV1",ci.value);
+ if(pi) writeAuxiliaryStorageV20261117("inPalletV1",pi.value);
+ if(di) writeAuxiliaryStorageV20261117("inDateV1",di.value);
  refresh();
  return safePersistV44("数据变更",false);
 }
@@ -4123,7 +4122,7 @@ function shiftInDate(days){
  const day=String(d.getDate()).padStart(2,"0");
  el.value=y+"-"+m+"-"+day;
 
- localStorage.setItem("inDateV1",el.value);
+ writeAuxiliaryStorageV20261117("inDateV1",el.value);
  syncInDateDisplay();
  updateInboundContext();
 }
@@ -4135,7 +4134,7 @@ function setToday(){
    const m=String(now.getMonth()+1).padStart(2,"0");
    const d=String(now.getDate()).padStart(2,"0");
    el.value=y+"-"+m+"-"+d;
-   localStorage.setItem("inDateV1",el.value);
+   writeAuxiliaryStorageV20261117("inDateV1",el.value);
  }
  syncInDateDisplay();
  updateInboundContext();
@@ -4890,9 +4889,9 @@ async function establishNewBackupBaselineV85(){
 
   lastKnownRecordCount=db.items.length; // 关键：允许 0 成为合法基准，不再取历史最大值。
   lastLocalSaveAt=new Date().toISOString();
-  localStorage.setItem("warehouseLastKnownCountV44",String(lastKnownRecordCount));
-  localStorage.setItem("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
-  try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){}
+  writeAuxiliaryStorageV20261117("warehouseLastKnownCountV44",String(lastKnownRecordCount));
+  writeAuxiliaryStorageV20261117("warehouseLastLocalSaveAtV44",lastLocalSaveAt);
+  /* IndexedDB 已保存主数据，不再向小容量缓存重复写整库。 */
 
   storageReady=true;
   clearStorageEmergencyV44();
@@ -6433,7 +6432,7 @@ async function importCsvData(input){
    persisted=await safePersistV44('CSV 导入完成',true);
    if(!persisted)throw new Error('写入 IndexedDB 失败，内存已恢复；请检查存储状态');
   }catch(e){db.items=previous;customerUsage=previousUsage;refresh();throw e;}
-  try{localStorage.setItem('customerUsageV1',JSON.stringify(customerUsage));}catch(e){}
+  try{writeAuxiliaryStorageV20261117('customerUsageV1',JSON.stringify(customerUsage));}catch(e){}
   refresh();showLocalSnapshotsV44();
   const summary=importSummaryW93(plan);toast('导入完成：'+summary);
   const info=document.getElementById('importResultV46');
@@ -6718,7 +6717,7 @@ function syncPageSizeControls(){
 function changeDataPageSize(v){
  dataPageSize=normalizePageSize(v);
  dataCurrentPage=1;
- localStorage.setItem("dataPageSizeV1",String(dataPageSize));
+ writeAuxiliaryStorageV20261117("dataPageSizeV1",String(dataPageSize));
  syncPageSizeControls();
  refresh();
 }
@@ -6729,7 +6728,7 @@ function applyCustomPageSize(){
  const n=normalizePageSize(el.value);
  dataPageSize=n;
  dataCurrentPage=1;
- localStorage.setItem("dataPageSizeV1",String(dataPageSize));
+ writeAuxiliaryStorageV20261117("dataPageSizeV1",String(dataPageSize));
  syncPageSizeControls();
  refresh();
 }
@@ -7495,7 +7494,7 @@ const inputContextSyncV33=["inExpress","inCustomer","palletInput","inDate"];inpu
 const _iosDateInput=document.getElementById("inDate");
 if(_iosDateInput){
   _iosDateInput.addEventListener("change",()=>{
-    localStorage.setItem("inDateV1",_iosDateInput.value||"");
+    writeAuxiliaryStorageV20261117("inDateV1",_iosDateInput.value||"");
     syncInDateDisplay();
     updateInboundContext();
   });

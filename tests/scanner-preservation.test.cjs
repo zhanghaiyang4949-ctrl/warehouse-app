@@ -5,6 +5,9 @@ test('扫码与非图片业务脚本保留，图片入库和同步恢复的预�
  const publish="function publish(value){window.dispatchEvent(new CustomEvent('warehouse-remote-backup',{detail:{key:k,sha:value.sha,exportedAt:value.exportedAt||''}}));return value}";
  let restored=html.replace(publish,'').replaceAll('return publish(remoteCache)','return remoteCache').replace("return publish({sha:'',db:null,exportedAt:''})","return {sha:'',db:null,exportedAt:''}");
  restored=restored.replace(/ if\(!window\.WarehouseTransferWarnings\.confirm\([^\n]+\n/g,'');
+ for(const helper of ['writeAuxiliaryStorageV20261117','releaseVerifiedMirrorV20261117'])restored=restored.replace(fn(restored,helper)+'\n','');
+ restored=restored.replace(/^[ \t]*releaseVerifiedMirrorV20261117\([^\n]+\n/gm,'').replaceAll('writeAuxiliaryStorageV20261117(', 'localStorage.setItem(').replaceAll('/* IndexedDB 已保存主数据，不再向小容量缓存重复写整库。 */','try{localStorage.setItem(KEY,JSON.stringify(db));}catch(e){}');
+ for(const name of ['safePersistV44'])restored=restored.replace(fn(restored,name),fn(original,name));
  for(const name of ['addExpress','recover','formatTrackingDisplayW96']){
   const previous=fn(original,name),current=fn(restored,name);restored=restored.replace(current,previous);
  }

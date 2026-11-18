@@ -26,7 +26,7 @@ function createR2(env,fetcher=fetch,now=Date.now){
   const all={host,...headers},names=Object.keys(all).sort(),signed=names.join(';');
   const params={'X-Amz-Algorithm':'AWS4-HMAC-SHA256','X-Amz-Credential':access+'/'+scope,'X-Amz-Date':stamp,'X-Amz-Expires':'120','X-Amz-SignedHeaders':signed};
   const query=Object.keys(params).sort().map(k=>encode(k)+'='+encode(params[k])).join('&');
-  const canonical=[method,path,query,names.map(k=>k+':'+String(all[k]).trim()+'\n').join(''),signed,headers['x-amz-content-sha256']||'UNSIGNED-PAYLOAD'].join('\n');
+  const canonical=[method,path,query,names.map(k=>k+':'+String(all[k]).trim()+'\n').join(''),signed,'UNSIGNED-PAYLOAD'].join('\n');
   const keyDate=hmac('AWS4'+secret,day),keyRegion=hmac(keyDate,'auto'),keyService=hmac(keyRegion,'s3'),keySign=hmac(keyService,'aws4_request');
   const signature=hmac(keySign,'AWS4-HMAC-SHA256\n'+stamp+'\n'+scope+'\n'+digest(canonical)).toString('hex');
   return 'https://'+host+path+'?'+query+'&X-Amz-Signature='+signature;

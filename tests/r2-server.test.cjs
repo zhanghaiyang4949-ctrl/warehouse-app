@@ -65,7 +65,8 @@ test('configured source routes R2 separately while preserving legacy GitHub',asy
  urls=[];await source.photo({github:{owner:'owner',repo:'repo',branch:'main',full}},'full');assert.equal(urls.length,2);assert.ok(urls.every(u=>u.startsWith('https://api.github.com/')));
 });
 // Independent verifier reconstructs the canonical request from the wire, rather
-// than invoking signer internals. SigV4 layout: AWS S3 query-string auth docs.
+// than invoking signer internals. Presigned query authentication uses UNSIGNED-PAYLOAD
+// in the canonical request even when a separately signed payload hash header exists.
 // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
 function verifyWireSignature(url,method,headers,body){
  const u=new URL(url),p=u.searchParams,escape=s=>encodeURIComponent(s).replace(/[!'()*]/g,c=>'%'+c.charCodeAt().toString(16).toUpperCase());
@@ -73,7 +74,7 @@ function verifyWireSignature(url,method,headers,body){
  const wireHeaders={host:u.host,...headers};
  const canonicalHeaders=p.get('X-Amz-SignedHeaders').split(';').map(name=>{assert.notEqual(wireHeaders[name],undefined);return name+':'+String(wireHeaders[name]).trim()+'\n';}).join('');
  const entries=[...p].filter(([key])=>key!=='X-Amz-Signature').map(([k,v])=>[escape(k),escape(v)]).sort(([a,av],[b,bv])=>a<b?-1:a>b?1:av<bv?-1:av>bv?1:0);
- const canonical=[method,u.pathname,entries.map(pair=>pair.join('=')).join('&'),canonicalHeaders,p.get('X-Amz-SignedHeaders'),headers['x-amz-content-sha256']||'UNSIGNED-PAYLOAD'].join('\n');
+ const canonical=[method,u.pathname,entries.map(pair=>pair.join('=')).join('&'),canonicalHeaders,p.get('X-Amz-SignedHeaders'),'UNSIGNED-PAYLOAD'].join('\n');
  const hash=crypto.createHash('sha256').update(canonical).digest('hex');
  const key=scopeParts.reduce((key,part)=>crypto.createHmac('sha256',key).update(part).digest(),Buffer.from('AWS4'+env.R2_SECRET_ACCESS_KEY));
  const computed=crypto.createHmac('sha256',key).update(['AWS4-HMAC-SHA256',p.get('X-Amz-Date'),scopeParts.join('/'),hash].join('\n')).digest('hex');

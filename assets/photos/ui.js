@@ -79,7 +79,7 @@
   const current=type==='draft'?inbound:records(type,id);
   const selected=JSON.parse(JSON.stringify(current));
   for(const draft of drafts)if(!selected.some(x=>x.id===draft.id)&&!(db.photoAttachments||[]).some(x=>x.id===draft.id))selected.push(draft.record);
-  const state={closed:false,processing:false,saving:false,selected};dialog=state;
+  const state={closed:false,processing:false,saving:false,selected,removed:new Set()};dialog=state;
   const layer=document.createElement('div');layer.className='warehouse-photo-editor';layer.innerHTML='<section role="dialog" aria-modal="true" aria-label="图片备注"><header><strong>图片备注</strong><button type="button" data-close>关闭</button></header><p>自动使用 MozJPEG 质量70压缩，列表显示缩略图。</p><div class="warehouse-photo-actions"><label class="photo-file-button">拍照<input type="file" accept="image/*" capture="environment" data-camera></label><label class="photo-file-button">选择图片<input type="file" accept="image/*" multiple data-files></label></div><div data-list></div><p data-message role="status"></p><footer><button type="button" class="primary" data-save>'+(type==='draft'?'用于本次入库':'保存图片备注')+'</button></footer></section>';
   const previous=document.body.style.overflow;document.body.style.overflow='hidden';document.body.append(layer);
   const message=layer.querySelector('[data-message]'),saveButton=layer.querySelector('[data-save]');
@@ -93,7 +93,9 @@
     const note=document.createElement('input');note.type='text';note.maxLength=500;note.placeholder='图片说明，例如无单号蓝色纸箱';note.value=record.note||'';note.oninput=()=>{record.note=note.value;};
     const details=document.createElement('div');details.className='warehouse-photo-edit-details';
     const size=document.createElement('small');size.className='warehouse-photo-size';size.textContent='压缩后 '+store.formatBytes(record.bytes)+' · 缩略图 '+store.formatBytes(record.thumbBytes);
-    details.append(size,note);row.append(button,details);list.append(row);
+    const remove=document.createElement('button');remove.type='button';remove.className='gray';remove.textContent='移除';
+    remove.onclick=()=>{if(state.processing||state.saving)return;if(!confirm('移除这张照片的关联？货物记录保留，点击保存后生效。'))return;state.removed.add(record.id);state.selected=state.selected.filter(row=>row.id!==record.id);render();};
+    details.append(size,note,remove);row.append(button,details);list.append(row);
    }
    let summary=layer.querySelector('[data-size-summary]');
    if(!summary){summary=document.createElement('p');summary.dataset.sizeSummary='';summary.className='warehouse-photo-size-summary';summary.setAttribute('role','status');list.after(summary);}
@@ -122,9 +124,8 @@
     if(type==='draft'){inbound=state.selected;refreshPanels();state.saving=false;close();return;}
     let committed=false;
     await root.githubGuardRun20261023(async()=>{
-     const previous=db.photoAttachments,updates=new Map(state.selected.map(row=>[row.id,row]));
-     db.photoAttachments=(previous||[]).map(row=>updates.get(row.id)||row);
-     db.photoAttachments=store.mergeRecords(db,state.selected);
+     const previous=db.photoAttachments;
+     db.photoAttachments=store.applyPhotoEdits(db,state.selected,state.removed);
      if(!await save()){db.photoAttachments=previous;throw Error('图片关联保存失败，本机照片已保留');}
      committed=true;
     });

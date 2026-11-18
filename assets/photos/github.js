@@ -100,6 +100,21 @@
      if(record.deleted)continue;
      const photo=await store.cache.get(record.id);if(!photo?.originLocal)continue;
      index++;progress('正在上传第 '+index+' 张照片…');
+     try {
+      if(!photo.uploaded?.full||!photo.uploaded?.thumbnail){
+      // Materialize legacy IndexedDB blobs before any network write. New cache records use bytes.
+      for(const variant of ['full','thumbnail'])if(!photo.uploaded?.[variant]) {
+       if(!photo[variant])throw Error('缺少照片内容');
+       photo[variant]=new Blob([await store.readBlobBytes(photo[variant])],{type:'image/jpeg'});
+      }
+      await store.cache.put(photo);
+      }
+     }catch(cause){
+      if(!['NotFoundError','NotReadableError'].includes(cause.name))throw cause;
+      const item=typeof db!=='undefined'?(db.items||[]).find(row=>record.targetType==='item'&&String(row.id)===String(record.targetId)):null;
+      const label=item?'单号 '+item.express:record.name||('照片 '+record.id);
+      throw Object.assign(Error('第 '+index+' 张照片（'+label+'）的本机内容无法读取。请到对应货物或托盘的图片中重新选图；仅添加新图不能修复旧图，需移除不可用旧图后保存，再同步。货物记录仍保留。'),{name:cause.name||'Error',photoId:record.id,cause});
+     }
      await uploadFile(photo,'full',signal);await uploadFile(photo,'thumbnail',signal);
     }
    } finally {bar.remove();uploadController=null;}

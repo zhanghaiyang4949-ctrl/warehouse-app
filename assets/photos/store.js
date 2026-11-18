@@ -16,12 +16,40 @@
   if(bytes<1024)return bytes+' B';
   return bytes<1048576?(bytes/1024).toFixed(1)+' KB':(bytes/1048576).toFixed(2)+' MB';
  }
+ function applyPhotoEdits(db, selected, removed) {
+  const updates=new Map(selected.map(row=>[row.id,row]));
+  const existing=(db.photoAttachments||[]).map(row=>removed.has(row.id)?{...row,deleted:true}:updates.get(row.id)||row);
+  return mergeRecords({photoAttachments:existing},selected.filter(row=>!removed.has(row.id)));
+ }
  function photoSizeSummary(records) {
   const known=records.every(row=>Number.isFinite(row.bytes)&&Number.isFinite(row.thumbBytes));
   const total=records.reduce((sum,row)=>sum+(row.bytes||0)+(row.thumbBytes||0),0);
   return '共 '+records.length+' 张 · '+(known?'图片合计 '+formatBytes(total)+'（含缩略图）':'部分图片大小未知');
  }
- if (typeof module !== 'undefined' && module.exports) { module.exports={scope,paths,mergeRecords,formatBytes,photoSizeSummary};return; }
+ async function readBlobBytes(blob, fallback) {
+  try { return await blob.arrayBuffer(); }
+  catch(error) {
+   if(fallback)return fallback(blob);
+   if(typeof FileReader==='undefined')throw error;
+   return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||error);reader.onabort=()=>reject(error);reader.readAsArrayBuffer(blob);});
+  }
+ }
+ async function encodePhoto(record) {
+  const copy={...record};
+  for(const key of ['full','thumbnail'])if(record[key]) {
+   try{copy[key+'Bytes']=await readBlobBytes(record[key]);}
+   catch(error){if(record.uploaded?.[key])continue;throw error;}
+   copy[key+'Type']=record[key].type||'image/jpeg';delete copy[key];
+  }
+  return copy;
+ }
+ function decodePhoto(record) {
+  if(!record)return record;
+  const copy={...record};
+  for(const key of ['full','thumbnail'])if(record[key+'Bytes'])copy[key]=new Blob([record[key+'Bytes']],{type:record[key+'Type']||'image/jpeg'});
+  return copy;
+ }
+ if (typeof module !== 'undefined' && module.exports) { module.exports={scope,paths,mergeRecords,applyPhotoEdits,formatBytes,photoSizeSummary,readBlobBytes,encodePhoto,decodePhoto};return; }
  let opened;
  function database() {
   if (!opened) opened = new Promise((resolve,reject) => {
@@ -48,8 +76,8 @@
   });
  }
  const cache = {
-  get:id => transaction('readonly',store=>store.get(id)),
-  put:record => transaction('readwrite',store=>store.put(record)),
+  get:async id => decodePhoto(await transaction('readonly',store=>store.get(id))),
+  put:async record => {const encoded=await encodePhoto(record);return transaction('readwrite',store=>store.put(encoded));},
   remove:id => transaction('readwrite',store=>store.delete(id))
  };
  async function digest(buffer, algorithm='SHA-256') {
@@ -57,7 +85,7 @@
  }
  async function blobSha(blob) {
   const prefix=new TextEncoder().encode('blob '+blob.size+'\0'),data=new Uint8Array(prefix.length+blob.size);
-  data.set(prefix);data.set(new Uint8Array(await blob.arrayBuffer()),prefix.length);
+  data.set(prefix);data.set(new Uint8Array(await readBlobBytes(blob)),prefix.length);
   return digest(data,'SHA-1');
  }
  function ownerKey(type,id) {return type+':'+String(id);}
@@ -123,7 +151,7 @@
  }
  async function drafts(type,targetId) {
   const key=scope(getGitHubConfigV44());
-  return transaction('readonly',store=>store.index('drafts').getAll([key,ownerKey(type,targetId),'draft']));
+  return (await transaction('readonly',store=>store.index('drafts').getAll([key,ownerKey(type,targetId),'draft']))).map(decodePhoto);
  }
- root.WarehousePhotoStore={scope,paths,mergeRecords,formatBytes,photoSizeSummary,cache,digest,blobSha,prepareCodec,compress,cancelCompression,makeDraft,drafts,ownerKey};
+ root.WarehousePhotoStore={scope,paths,mergeRecords,applyPhotoEdits,formatBytes,photoSizeSummary,readBlobBytes,cache,digest,blobSha,prepareCodec,compress,cancelCompression,makeDraft,drafts,ownerKey};
 })(typeof window!=='undefined'?window:globalThis);

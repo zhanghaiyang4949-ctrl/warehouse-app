@@ -62,7 +62,7 @@
   const payload=originalPayload(),items=db.items.filter(x=>!x.deleted&&(!x.status||x.status==='在库'));
   payload.version=3;payload.items=payload.items.map((x,i)=>({...x,id:String(items[i].id)}));
   const ids=new Set(items.map(x=>String(x.id))),pallets=new Set(items.map(x=>String(x.pallet)));
-  payload.photoAttachments=(db.photoAttachments||[]).filter(p=>!p.deleted&&(p.targetType==='item'&&ids.has(String(p.targetId))||p.targetType==='pallet'&&pallets.has(String(p.targetId)))).map(p=>({id:p.id,targetType:p.targetType,targetId:p.targetId,note:p.note||'',github:{owner:p.github?.owner,repo:p.github?.repo,branch:p.github?.branch,full:p.github?.full,thumbnail:p.github?.thumbnail}}));
+  payload.photoAttachments=(db.photoAttachments||[]).filter(p=>!p.deleted&&(p.targetType==='item'&&ids.has(String(p.targetId))||p.targetType==='pallet'&&pallets.has(String(p.targetId)))).map(p=>({id:p.id,targetType:p.targetType,targetId:p.targetId,note:p.note||'',...(p.storage?.provider==='r2'?{storage:{provider:'r2',bucket:p.storage.bucket,full:p.storage.full,thumbnail:p.storage.thumbnail},hash:p.hash,thumbHash:p.thumbHash,bytes:p.bytes,thumbBytes:p.thumbBytes}:{github:{owner:p.github?.owner,repo:p.github?.repo,branch:p.github?.branch,full:p.github?.full,thumbnail:p.github?.thumbnail}})}));
   return payload;
  };
  // 仅替换查询快照的发布目的地；不替换库存保存、库存备份或配单操作。
@@ -84,5 +84,6 @@
    localStorage.setItem('queryLastSyncAtV73',new Date().toISOString());return payload.items.length;
   }finally{clearTimeout(timeout);}
  };
+ root.WarehouseQueryAccessTransport={call};
  schedule();if(key&&settings.endpoint)refresh();
 })(window);

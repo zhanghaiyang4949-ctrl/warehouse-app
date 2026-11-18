@@ -1,0 +1,9 @@
+[
+  {
+    "AllowedOrigins": ["https://zhanghaiyang4949-ctrl.github.io"],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["Content-Type", "X-Amz-Content-Sha256", "X-Amz-Meta-Sha256", "X-Amz-Meta-Bytes", "If-None-Match"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]

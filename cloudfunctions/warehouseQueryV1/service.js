@@ -61,8 +61,16 @@ function createService({repo,source,adminSecret,now=Date.now}) {
  async function dispatch(action,args={},context={}) {
   const ip=hash(context.ip||'unavailable');
   if(action.startsWith('admin')) {
-   await rate('admin:'+ip,60);
+   const r2Action=['adminR2Info','adminR2Upload','adminR2Verify','adminR2Read'].includes(action);
+   await rate((r2Action?'admin-r2:':'admin:')+ip,r2Action?240:60);
    if(!equal(context.adminKey||'',adminSecret))throw fail('管理密钥不正确');
+   if(action==='adminR2Info')return source.r2?source.r2.info():{enabled:false,bucket:''};
+   if(['adminR2Upload','adminR2Verify','adminR2Read'].includes(action)){
+    if(!source.r2)throw fail('R2照片存储尚未配置','R2_DISABLED',503);
+    if(action==='adminR2Upload')return source.r2.upload(args.record);
+    if(action==='adminR2Verify')return source.r2.verify(args.record,args.variant);
+    return source.r2.read(args.record,args.variant);
+   }
    if(action==='adminInfo')return source.info();
    if(action==='adminList') {
     const page=await repo.list('devices',String(args.cursor||''),51);

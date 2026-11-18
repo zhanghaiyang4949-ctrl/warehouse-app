@@ -144,8 +144,12 @@
  async function makeDraft(file,type,targetId) {
   const config=getGitHubConfigV44();
   if(!config.owner || !config.repo)throw Error('请先在数据安全中设置GitHub备份仓库');
-  const encoded=await compress(file),hash=await digest(await encoded.full.arrayBuffer());
+  const selected=root.WarehousePhotoR2?.config();
+  if(selected?.provider==='r2'&&!selected.bucket)throw Error('R2存储桶未配置');
+  const encoded=await compress(file),hash=await digest(await encoded.full.arrayBuffer()),thumbHash=await digest(await encoded.thumbnail.arrayBuffer());
   const record={id:crypto.randomUUID(),targetType:type,targetId:String(targetId),note:'',name:type==='pallet'?'托盘 '+targetId+' 照片':'箱子照片',createdAt:new Date().toISOString(),hash,width:encoded.width,height:encoded.height,bytes:encoded.full.size,thumbBytes:encoded.thumbnail.size,github:{owner:config.owner,repo:config.repo,branch:config.branch,...paths(hash)}};
+  record.thumbHash=thumbHash;
+  const storage=root.WarehousePhotoR2?.draftStorage(paths(hash));if(storage)record.storage=storage;
   await cache.put({id:record.id,record,full:encoded.full,thumbnail:encoded.thumbnail,originLocal:true,draft:true,stage:'draft',scope:scope(config),owner:ownerKey(type,targetId),uploaded:{}});
   return record;
  }

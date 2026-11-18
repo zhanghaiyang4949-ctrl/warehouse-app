@@ -1,7 +1,9 @@
 'use strict';
 const {hash}=require('./service');
 const {gunzipSync}=require('node:zlib');
+const {createR2}=require('./r2');
 function createSource(env,fetcher=fetch,now=Date.now) {
+ const r2=createR2(env,fetcher,now);
  const owner=env.QUERY_GITHUB_OWNER,repo=env.QUERY_GITHUB_REPO,branch=env.QUERY_GITHUB_BRANCH||'main',path=env.QUERY_GITHUB_PATH||'query-secure/query-data.json';
  const token=env.QUERY_GITHUB_TOKEN;
  if(!owner||!repo||!token)throw Error('请配置私有查询数据仓库及只读Token');
@@ -48,11 +50,12 @@ function createSource(env,fetcher=fetch,now=Date.now) {
   })();try{return await loading;}finally{loading=null;}
  }
  async function photo(record,variant,{deadline=Date.now()+18000}={}) {
+  if(record.storage?.provider==='r2')return r2.photo(record,variant,{deadline});
   await privateRepo(deadline);const github=record.github,p=github?.[variant];
   if(!github||github.owner!==owner||github.repo!==repo||github.branch!==branch||!/^warehouse-images\/[0-9]{4}\/[0-9]{2}\/[0-9]{2}\/[a-f0-9]{2}\/[a-f0-9]{64}(?:-thumb)?\.jpg$/.test(p||''))throw Object.assign(Error('图片来源与私有仓库不一致'),{code:'PHOTO_SOURCE_INVALID',status:403});
   const bytes=await request(fileUrl(p),true,4*1024*1024,deadline,14000);
   if(bytes[0]!==255||bytes[1]!==216)throw Error('图片不是有效JPEG文件');return bytes.toString('base64');
  }
- return {load,photo,info:async()=>{await privateRepo();return {owner,repo,branch,path};}};
+ return {load,photo,r2,info:async()=>{await privateRepo();return {owner,repo,branch,path};}};
 }
 module.exports={createSource};

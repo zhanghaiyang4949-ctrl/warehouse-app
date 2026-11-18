@@ -1,0 +1,9 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+function payload(db){const s=fs.readFileSync('assets/query-access.js','utf8'),a=s.indexOf('root.buildQueryPayloadV72=function(){'),b=s.indexOf('\n };',a)+4;assert.ok(a>=0&&b>a);const ctx={db,root:{},originalPayload:()=>({items:db.items.filter(x=>!x.deleted&&(!x.status||x.status==='在库')).map(x=>({express:x.express}))})};vm.runInNewContext(s.slice(a,b),ctx);return ctx.root.buildQueryPayloadV72();}
+test('查询快照保留R2对象定位和校验，不含密钥和临时签名',()=>{
+ const db={items:[{id:1,express:'123',pallet:'A'}],photoAttachments:[{id:'r2',targetType:'item',targetId:'1',hash:'a'.repeat(64),thumbHash:'b'.repeat(64),bytes:100,thumbBytes:20,storage:{provider:'r2',bucket:'warehouse-photos',full:'warehouse-images/full.jpg',thumbnail:'warehouse-images/thumb.jpg',secret:'never-export',url:'signed-secret-url'},secret:'never-export'}]};
+ const p=payload(db),r=p.photoAttachments[0];assert.equal(r.storage.provider,'r2');assert.equal(r.storage.bucket,'warehouse-photos');assert.equal(r.hash,'a'.repeat(64));assert.equal(r.thumbHash,'b'.repeat(64));assert.equal(r.bytes,100);assert.equal(r.thumbBytes,20);assert.equal(r.github,undefined);assert.ok(!JSON.stringify(p).includes('never-export'));assert.ok(!JSON.stringify(p).includes('signed-secret-url'));
+});
+test('旧GitHub照片及可见性过滤保持，Token不出现在查询快照',()=>{
+ const p=payload({items:[{id:1,pallet:'A'},{id:2,deleted:true}],photoAttachments:[{id:'g',targetType:'item',targetId:'1',github:{owner:'owner',repo:'repo',branch:'main',full:'full',thumbnail:'thumb',token:'private-token'}},{id:'hide',targetType:'item',targetId:'2',github:{}}]});assert.equal(p.photoAttachments.length,1);assert.equal(p.photoAttachments[0].github.owner,'owner');assert.ok(!JSON.stringify(p).includes('private-token'));
+});

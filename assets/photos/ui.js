@@ -175,6 +175,15 @@
    input.dispatchEvent(new Event('input',{bubbles:true}));
   };
   const status=document.createElement('div');status.className='warehouse-photo-summary';status.innerHTML='<span data-photo-total></span><span data-photo-sync-status>照片与货物一起在确认同步时上传</span><button type="button" class="gray">检查并续传</button>';status.querySelector('button').onclick=()=>root.WarehouseUploadRecovery?.hasPending()?root.WarehouseUploadRecovery.retry().catch(error=>toast(error.message)):backupToGitHubV44();document.querySelector('.github-version-box20261023')?.append(status);
+  if(root.WarehousePhotoR2){
+   const settings=document.createElement('div');settings.className='warehouse-photo-r2-settings';
+   settings.innerHTML='<label>新照片存储 <select aria-label="新照片存储"><option value="github">GitHub</option><option value="r2">私有 R2</option></select></label> <button type="button" class="gray">检查 R2 连接</button><small role="status"></small>';
+   const select=settings.querySelector('select'),info=settings.querySelector('small'),button=settings.querySelector('button');select.value=root.WarehousePhotoR2.config().provider||'github';
+   info.textContent=select.value==='r2'?' 已选择私有 R2（仅新照片）':' 默认使用 GitHub；R2 需先在服务端配置';
+   button.onclick=async()=>{button.disabled=true;try{const result=await root.WarehousePhotoR2.connect();info.textContent=' 已连接私有桶：'+result.bucket+'；可选择 R2 用于新照片';}catch(error){info.textContent=error.message;}finally{button.disabled=false;}};
+   select.onchange=()=>{try{root.WarehousePhotoR2.select(select.value);info.textContent=' 已保存，仅影响之后添加的新照片';}catch(error){select.value=root.WarehousePhotoR2.config().provider||'github';info.textContent=error.message;}};
+   status.append(settings);
+  }
   const drafts=await store.drafts('draft','inbound');inbound=drafts.map(row=>row.record).filter(row=>!(db.photoAttachments||[]).some(x=>x.id===row.id));
   observer=new MutationObserver(refreshPanels);observer.observe(document.querySelector('.wrap'),{childList:true,subtree:true});refreshPanels();
  }

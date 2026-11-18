@@ -56,7 +56,14 @@
   }
   localStorage.setItem(key,String(Date.now()+9000));
  }
+ function storageIdentity(record) {
+  const storage=record.storage;
+  if(storage?.provider==='r2')return JSON.stringify(['r2',storage.bucket,storage.full,storage.thumbnail,record.hash,record.thumbHash,record.bytes,record.thumbBytes]);
+  const github=record.github||{};return JSON.stringify(['github',github.owner,github.repo,github.branch,github.full,github.thumbnail]);
+ }
+ function complete(photo,variant) {return photo.record.storage?.provider==='r2'?root.WarehousePhotoR2.complete(photo,variant):!!photo.uploaded?.[variant];}
  async function uploadFile(photo,variant,signal) {
+  if(photo.record.storage?.provider==='r2')return root.WarehousePhotoR2.uploadFile(photo,variant,signal);
   const github=photo.record.github,path=github[variant],blob=photo[variant];
   if(photo.uploaded?.[variant])return;
   if(!blob)throw Error('本机缺少待上传的照片，请在拍照的原设备上同步');
@@ -84,7 +91,8 @@
   for(const record of records||[]) {
    if(record.deleted)continue;
    const photo=await store.cache.get(record.id);
-   if(photo?.originLocal&&(!photo.uploaded?.full||!photo.uploaded?.thumbnail))return true;
+   if(photo?.originLocal&&storageIdentity(photo.record)!==storageIdentity(record))throw Error('照片存储信息已变化，请重新预览');
+   if(photo?.originLocal&&(!complete(photo,'full')||!complete(photo,'thumbnail')))return true;
   }
   return false;
  }
@@ -99,11 +107,13 @@
     for(const record of records||[]) {
      if(record.deleted)continue;
      const photo=await store.cache.get(record.id);if(!photo?.originLocal)continue;
+     if(store.scope(photo.record.github)!==store.scope(config()))throw Error('图片所属仓库与当前设置不同，请切回原仓库同步');
+     if(storageIdentity(photo.record)!==storageIdentity(record))throw Error('照片存储信息已变化，请重新预览');
      index++;progress('正在上传第 '+index+' 张照片…');
      try {
-      if(!photo.uploaded?.full||!photo.uploaded?.thumbnail){
+      if(!complete(photo,'full')||!complete(photo,'thumbnail')){
       // Materialize legacy IndexedDB blobs before any network write. New cache records use bytes.
-      for(const variant of ['full','thumbnail'])if(!photo.uploaded?.[variant]) {
+      for(const variant of ['full','thumbnail'])if(!complete(photo,variant)) {
        if(!photo[variant])throw Error('缺少照片内容');
        photo[variant]=new Blob([await store.readBlobBytes(photo[variant])],{type:'image/jpeg'});
       }
@@ -123,13 +133,16 @@
   return execute();
  }
  async function imageURL(record,variant='thumbnail') {
-  const key=record.id+':'+variant;
+  const key=record.id+':'+variant+':'+storageIdentity(record);
   if(urls.has(key)){const value=urls.get(key);urls.delete(key);urls.set(key,value);return value;}
-  let cached=await store.cache.get(record.id),blob=cached?.[variant];
+  let cached=await store.cache.get(record.id);
+  if(cached?.record&&storageIdentity(cached.record)!==storageIdentity(record))throw Error('照片存储信息与本机缓存不同，已保留本机照片，请重新预览');
+  let blob=cached?.[variant];
   if(!blob){
-   const github=record.github,response=await request(endpoint(github,github[variant])+'?ref='+encodeURIComponent(github.branch),{headers:headers(true)});
+   if(record.storage?.provider==='r2'){blob=await root.WarehousePhotoR2.read(record,variant);}
+   else {const github=record.github,response=await request(endpoint(github,github[variant])+'?ref='+encodeURIComponent(github.branch),{headers:headers(true)});
    if(!response.ok)throw Error('图片尚未上传或当前账号无读取权限');
-   blob=new Blob([await response.arrayBuffer()],{type:'image/jpeg'});
+   blob=new Blob([await response.arrayBuffer()],{type:'image/jpeg'});}
    cached={...cached,id:record.id,record,stage:'saved',draft:false,uploaded:{...cached?.uploaded,[variant]:true},[variant]:blob};
    await store.cache.put(cached);
   }

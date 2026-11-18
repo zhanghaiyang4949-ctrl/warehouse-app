@@ -143,12 +143,14 @@
  },true);
  const guard=root.warehouseGitHubGuard20261023,originalConfirm=guard.confirm.bind(guard);
  guard.confirm=async function(plan,choices={}) {
+  let photoStage='检查本机照片缓存';try{
   const merged=WarehouseOfflineSync.merge(plan.base.db,plan.local,plan.remote.db||{items:[]},choices);
   if(!merged.conflicts.length&&await git.pending(merged.db.photoAttachments)){
    const c=getGitHubConfigV44(),key='warehouseGitHubGuard20261023:'+JSON.stringify([c.owner,c.repo,c.branch,c.path]);
    if(key!==plan.key||await guard.hashLocal()!==plan.localHash)throw Error('预览后本机数据或仓库设置已变化，请重新预览');
-   await git.upload(merged.db.photoAttachments);
+   photoStage='上传照片';await git.upload(merged.db.photoAttachments);
   }
+  }catch(e){const error=new Error('同步失败【'+photoStage+' / '+(e.name||'Error')+'】：'+e.message);error.cause=e;error.name=e.name;for(const k of ['status','cancelled','transient'])if(e[k]!==undefined)error[k]=e[k];throw error;}
   return originalConfirm(plan,choices);
  };
  root.WarehousePhotos={

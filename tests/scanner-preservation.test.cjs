@@ -14,6 +14,18 @@ test('扫码与非图片业务脚本保留，图片入库和同步恢复的预�
  restored=restored.replace(fn(original,'recover')+'\nasync function inspect',fn(original,'recover')+'async function inspect');
  restored=restored.replaceAll('esc(formatTrackingDisplayW96(x.express))','esc(x.express)');
  restored=restored.replace("collections=['items','packingHistory','outboundEvents','warehouseMaps','photoAttachments']","collections=['items','packingHistory','outboundEvents','warehouseMaps']").replace(",photoAttachments:'图片备注'",'').replace("targetType:'照片关联类型',targetId:'关联记录',bytes:'大图字节',thumbBytes:'缩略图字节',",'');
+
+ // Only unwrap the explicitly tested sync-stage diagnostics; business statements remain compared.
+ const current=fs.readFileSync('index.html','utf8');
+ const helper=current.slice(current.indexOf('async function step(label,fn)'),current.indexOf('let busy=false;',current.indexOf('async function step(label,fn)')));
+ restored=restored.replace(helper,'');
+ for(const [stage,call] of [
+  ['保存本地保护快照',"o.snapshot('离线合并提交前保护')"],
+  ['计算备份校验值','o.blobHash(payload)'],
+  ['保存上传待确认记录','store(meta,plan.key)'],
+  ['上传GitHub备份','o.put(plan.remote.sha,payload)'],
+  ['写入本机合并结果（服务器可能已保存，请重新预览核实）',"o.commit(result.db,{sha:response.sha,db:result.db,syncedAt:new Date().toISOString()})"]
+ ])restored=restored.replace("step('"+stage+"',()=>"+call+")",call);
  assert.deepEqual(scripts(restored),scripts(original));
 });
 function fn(source,name){const start=source.indexOf('function '+name+'(');assert.ok(start>=0,name);let at=source.indexOf('{',start),n=1,i=at+1;for(;n;i++){if(source[i]==='{')n++;if(source[i]==='}')n--}return source.slice(start,i)}
